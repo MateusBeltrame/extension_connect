@@ -6,7 +6,7 @@ import br.com.mateushb.extensionconnectapp.model.Usuario
 // Regras de validação compartilhadas pelas telas de acesso (spec 001)
 internal object ValidacaoAcesso {
 
-    const val DOMINIO_INSTITUCIONAL = "@afya.br"
+    const val DOMINIO_INSTITUCIONAL = "@alunos.afya.com.br"
     const val TAMANHO_MINIMO_SENHA = 6
 
     fun erroEmail(email: String, exigirDominio: Boolean = false): String? {
