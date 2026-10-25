@@ -78,7 +78,7 @@ private fun FormularioRecuperarSenha(onEnviarClick: (String) -> Unit) {
             AppTextField(
                 value = email,
                 onValueChange = { email = it; emailErro = null },
-                placeholder = "usuario@afya.br",
+                placeholder = "Digite seu e-mail",
                 label = "E-mail",
                 leadingIcon = { IconeCampo(Icons.Outlined.Email) },
                 supportingText = emailErro,

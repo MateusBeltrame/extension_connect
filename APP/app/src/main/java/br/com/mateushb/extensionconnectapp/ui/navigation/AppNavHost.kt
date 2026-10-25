@@ -2,23 +2,50 @@ package br.com.mateushb.extensionconnectapp.ui.navigation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavDestination
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import br.com.mateushb.extensionconnectapp.model.PerfilUsuario
 import br.com.mateushb.extensionconnectapp.model.Usuario
 import br.com.mateushb.extensionconnectapp.ui.state.CadastroUiState
 import br.com.mateushb.extensionconnectapp.ui.state.CompletarCadastroUiState
@@ -26,9 +53,11 @@ import br.com.mateushb.extensionconnectapp.ui.state.LoginUiState
 import br.com.mateushb.extensionconnectapp.ui.state.SessaoUiState
 import br.com.mateushb.extensionconnectapp.ui.telas.AcessoScreen
 import br.com.mateushb.extensionconnectapp.ui.telas.CompletarCadastroScreen
-import br.com.mateushb.extensionconnectapp.ui.telas.InicioScreen
+import br.com.mateushb.extensionconnectapp.ui.telas.EmBreveScreen
+import br.com.mateushb.extensionconnectapp.ui.telas.ProjetosListaScreen
 import br.com.mateushb.extensionconnectapp.ui.telas.RecuperarSenhaScreen
 import br.com.mateushb.extensionconnectapp.ui.viewmodel.AutenticacaoViewModel
+import br.com.mateushb.extensionconnectapp.ui.viewmodel.ProjetoViewModel
 
 @Composable
 fun AppNavHost(
@@ -81,102 +110,255 @@ fun AppNavHost(
         }
     }
 
-    NavHost(
-        navController = navController,
-        startDestination = destinoInicial
+    // BottomBar condicional por perfil (06-navegacao.md): só nas rotas de topo do perfil logado
+    val entradaAtual by navController.currentBackStackEntryAsState()
+    val itensBottomBar = itensDaBottomBar(autenticacaoViewModel.usuarioLogado?.perfil)
+    val destinoAtual = entradaAtual?.destination
+    val mostrarBottomBar = itensBottomBar.any { it.estaSelecionado(destinoAtual) }
+
+    Scaffold(
+        bottomBar = {
+            if (mostrarBottomBar) {
+                AppBottomBar(
+                    itens = itensBottomBar,
+                    destinoAtual = destinoAtual,
+                    onItemClick = { item -> navegarLimpandoPilha(item.rota) }
+                )
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.background,
+        // Insets ficam com cada tela (barras com gradiente por trás da status bar); o padding externo
+        // é só a altura da BottomBar, que já inclui a barra de navegação do sistema
+        contentWindowInsets = WindowInsets(0)
+    ) { innerPadding ->
+        // Aplicado só nas telas de topo (ComBottomBar), não no NavHost inteiro: a tela que está saindo
+        // no login/logout não muda de tamanho no meio da transição
+        val alturaBottomBar = innerPadding.calculateBottomPadding()
+        NavHost(
+            navController = navController,
+            startDestination = destinoInicial
+        ) {
+            // ============================
+            // Agrupamento: Autenticação
+            // ============================
+            composable<AppRoute.Acesso> {
+                val loginUiState = autenticacaoViewModel.loginUiState
+                val cadastroUiState = autenticacaoViewModel.cadastroUiState
+
+                LaunchedEffect(loginUiState, cadastroUiState) {
+                    if (loginUiState is LoginUiState.Sucesso || cadastroUiState is CadastroUiState.Sucesso) {
+                        autenticacaoViewModel.limparLoginUiState()
+                        autenticacaoViewModel.limparCadastroUiState()
+                        autenticacaoViewModel.usuarioLogado?.let { navegarLimpandoPilha(destinoAposLogin(it)) }
+                    }
+                }
+
+                AcessoScreen(
+                    loginUiState = loginUiState,
+                    cadastroUiState = cadastroUiState,
+                    onEntrarClick = { email, senha ->
+                        autenticacaoViewModel.entrar(email, senha)
+                    },
+                    onCadastrarClick = { nome, email, senha ->
+                        autenticacaoViewModel.cadastrar(nome, email, senha)
+                    },
+                    onEsqueceuSenhaClick = {
+                        // Cada visita começa no formulário; launchSingleTop evita empilhar com toque duplo
+                        autenticacaoViewModel.limparRecuperarSenhaUiState()
+                        navController.navigate(AppRoute.RecuperarSenha) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onLoginErroDispensado = {
+                        autenticacaoViewModel.limparLoginUiState()
+                    },
+                    onCadastroErroDispensado = {
+                        autenticacaoViewModel.limparCadastroUiState()
+                    }
+                )
+            }
+
+            composable<AppRoute.RecuperarSenha> { entrada ->
+                RecuperarSenhaScreen(
+                    recuperarSenhaUiState = autenticacaoViewModel.recuperarSenhaUiState,
+                    onEnviarClick = { email ->
+                        autenticacaoViewModel.enviarLinkRecuperacao(email)
+                    },
+                    onVoltarClick = {
+                        // Só a entrada ativa volta: um segundo toque durante a transição desempilharia Acesso
+                        if (entrada.lifecycle.currentState == Lifecycle.State.RESUMED) {
+                            navController.popBackStack()
+                        }
+                    }
+                )
+            }
+
+            composable<AppRoute.CompletarCadastro> { entrada ->
+                val usuario = usuarioDaRota(autenticacaoViewModel.usuarioLogado) { redirecionarSemSessao(entrada) }
+                    ?: return@composable
+                val completarCadastroUiState = autenticacaoViewModel.completarCadastroUiState
+
+                LaunchedEffect(completarCadastroUiState) {
+                    if (completarCadastroUiState is CompletarCadastroUiState.Sucesso) {
+                        autenticacaoViewModel.limparCompletarCadastroUiState()
+                        navegarLimpandoPilha(AppRoute.ProjetosLista)
+                    }
+                }
+
+                CompletarCadastroScreen(
+                    usuario = usuario,
+                    completarCadastroUiState = completarCadastroUiState,
+                    onSalvarClick = { ra, curso ->
+                        autenticacaoViewModel.completarCadastro(ra, curso)
+                    },
+                    onSairClick = sair,
+                    onErroMostrado = {
+                        autenticacaoViewModel.limparCompletarCadastroUiState()
+                    }
+                )
+            }
+
+            // ============================
+            // Agrupamento: Projetos
+            // ============================
+            composable<AppRoute.ProjetosLista> { entrada ->
+                val usuario = usuarioDaRota(autenticacaoViewModel.usuarioLogado) { redirecionarSemSessao(entrada) }
+                    ?: return@composable
+
+                // Escopo da entrada da pilha: descartado em "Sair da conta" e ao trocar de item da
+                // BottomBar (popUpTo do grafo), então nada da sessão anterior chega ao próximo usuário
+                val projetoViewModel: ProjetoViewModel = viewModel()
+
+                LaunchedEffect(usuario) {
+                    projetoViewModel.carregarProjetos(usuario)
+                }
+
+                ComBottomBar(alturaBottomBar) {
+                    ProjetosListaScreen(
+                        usuario = usuario,
+                        listaUiState = projetoViewModel.listaUiState,
+                        busca = projetoViewModel.busca,
+                        filtroAtual = projetoViewModel.filtroAtual,
+                        onBuscaChange = { projetoViewModel.alterarBusca(it) },
+                        onAplicarFiltro = { projetoViewModel.aplicarFiltro(it) },
+                        onAlternarSouOrientador = { projetoViewModel.alternarSouOrientador() },
+                        onAlternarSoParados = { projetoViewModel.alternarSoParados() },
+                        onLimparFiltros = { projetoViewModel.limparFiltros() },
+                        onTentarNovamente = { projetoViewModel.carregarProjetos(usuario) }
+                    )
+                }
+            }
+
+            // ============================
+            // Agrupamento: Pessoas, Perfil e Mural (provisórias)
+            // ============================
+            composable<AppRoute.PessoasLista> { entrada ->
+                val usuario = usuarioDaRota(autenticacaoViewModel.usuarioLogado) { redirecionarSemSessao(entrada) }
+                    ?: return@composable
+
+                // Só Administrador: pilha restaurada com outro perfil volta para Projetos
+                if (usuario.perfil != PerfilUsuario.ADMINISTRADOR) {
+                    LaunchedEffect(Unit) { navegarLimpandoPilha(AppRoute.ProjetosLista) }
+                    return@composable
+                }
+                ComBottomBar(alturaBottomBar) { EmBreveScreen(titulo = "Pessoas") }
+            }
+
+            composable<AppRoute.MeuPerfil> { entrada ->
+                usuarioDaRota(autenticacaoViewModel.usuarioLogado) { redirecionarSemSessao(entrada) }
+                    ?: return@composable
+
+                // "Sair da conta" fica aqui até a feature 8 (Meu perfil)
+                ComBottomBar(alturaBottomBar) { EmBreveScreen(titulo = "Meu perfil", onSairClick = sair) }
+            }
+
+            composable<AppRoute.Mural> { entrada ->
+                // Acesso sem login entra com a feature 9; por ora só é alcançado pela BottomBar
+                usuarioDaRota(autenticacaoViewModel.usuarioLogado) { redirecionarSemSessao(entrada) }
+                    ?: return@composable
+
+                ComBottomBar(alturaBottomBar) { EmBreveScreen(titulo = "Mural") }
+            }
+        }
+    }
+}
+
+// ===== BottomBar =====
+
+private enum class ItemBottomBar(val rota: AppRoute, val rotulo: String, val icone: ImageVector) {
+    PROJETOS(AppRoute.ProjetosLista, "Projetos", Icons.Outlined.GridView),
+    MURAL(AppRoute.Mural, "Mural", Icons.Outlined.WorkspacePremium),
+    PESSOAS(AppRoute.PessoasLista, "Pessoas", Icons.Outlined.Group),
+    PERFIL(AppRoute.MeuPerfil, "Perfil", Icons.Outlined.Person);
+
+    fun estaSelecionado(destino: NavDestination?): Boolean = when (this) {
+        PROJETOS -> destino?.hasRoute<AppRoute.ProjetosLista>() == true
+        MURAL -> destino?.hasRoute<AppRoute.Mural>() == true
+        PESSOAS -> destino?.hasRoute<AppRoute.PessoasLista>() == true
+        PERFIL -> destino?.hasRoute<AppRoute.MeuPerfil>() == true
+    }
+}
+
+// Sem sessão não há BottomBar; Pessoas só para Administrador
+private fun itensDaBottomBar(perfil: PerfilUsuario?): List<ItemBottomBar> = when (perfil) {
+    null -> emptyList()
+    PerfilUsuario.ADMINISTRADOR -> ItemBottomBar.entries
+    else -> ItemBottomBar.entries - ItemBottomBar.PESSOAS
+}
+
+// Altura da BottomBar como padding inferior de uma tela de topo. Guarda o último valor: no logout a
+// barra some no início da transição e a tela que está saindo não deve pular. consumeWindowInsets evita
+// que o Scaffold interno some de novo o inset da navegação do sistema
+@Composable
+private fun ComBottomBar(alturaBottomBar: Dp, content: @Composable () -> Unit) {
+    val ultimaAltura = remember { UltimaAltura() }
+    if (alturaBottomBar > 0.dp) ultimaAltura.valor = alturaBottomBar
+    val padding = PaddingValues(bottom = ultimaAltura.valor)
+    Box(
+        modifier = Modifier
+            .padding(padding)
+            .consumeWindowInsets(padding)
     ) {
-        // ============================
-        // Agrupamento: Autenticação
-        // ============================
-        composable<AppRoute.Acesso> {
-            val loginUiState = autenticacaoViewModel.loginUiState
-            val cadastroUiState = autenticacaoViewModel.cadastroUiState
+        content()
+    }
+}
 
-            LaunchedEffect(loginUiState, cadastroUiState) {
-                if (loginUiState is LoginUiState.Sucesso || cadastroUiState is CadastroUiState.Sucesso) {
-                    autenticacaoViewModel.limparLoginUiState()
-                    autenticacaoViewModel.limparCadastroUiState()
-                    autenticacaoViewModel.usuarioLogado?.let { navegarLimpandoPilha(destinoAposLogin(it)) }
-                }
+// Não é State de propósito: só guarda o valor entre composições, sem disparar recomposição
+private class UltimaAltura(var valor: Dp = 0.dp)
+
+// Frame bottom-nav (33:2): fundo branco com borda superior, item ativo rosa com pílula rosa clara
+@Composable
+private fun AppBottomBar(
+    itens: List<ItemBottomBar>,
+    destinoAtual: NavDestination?,
+    onItemClick: (ItemBottomBar) -> Unit
+) {
+    Column {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+            itens.forEach { item ->
+                val selecionado = item.estaSelecionado(destinoAtual)
+                NavigationBarItem(
+                    selected = selecionado,
+                    onClick = { if (!selecionado) onItemClick(item) },
+                    // O rótulo já descreve o item: descrição no ícone faria o TalkBack ler duas vezes
+                    icon = { Icon(imageVector = item.icone, contentDescription = null) },
+                    label = {
+                        Text(
+                            text = item.rotulo,
+                            fontSize = 12.sp,
+                            fontWeight = if (selecionado) FontWeight.SemiBold else FontWeight.Medium
+                        )
+                    },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                )
             }
-
-            AcessoScreen(
-                loginUiState = loginUiState,
-                cadastroUiState = cadastroUiState,
-                onEntrarClick = { email, senha ->
-                    autenticacaoViewModel.entrar(email, senha)
-                },
-                onCadastrarClick = { nome, email, senha ->
-                    autenticacaoViewModel.cadastrar(nome, email, senha)
-                },
-                onEsqueceuSenhaClick = {
-                    // Cada visita começa no formulário; launchSingleTop evita empilhar com toque duplo
-                    autenticacaoViewModel.limparRecuperarSenhaUiState()
-                    navController.navigate(AppRoute.RecuperarSenha) {
-                        launchSingleTop = true
-                    }
-                },
-                onLoginErroDispensado = {
-                    autenticacaoViewModel.limparLoginUiState()
-                },
-                onCadastroErroDispensado = {
-                    autenticacaoViewModel.limparCadastroUiState()
-                }
-            )
-        }
-
-        composable<AppRoute.RecuperarSenha> { entrada ->
-            RecuperarSenhaScreen(
-                recuperarSenhaUiState = autenticacaoViewModel.recuperarSenhaUiState,
-                onEnviarClick = { email ->
-                    autenticacaoViewModel.enviarLinkRecuperacao(email)
-                },
-                onVoltarClick = {
-                    // Só a entrada ativa volta: um segundo toque durante a transição desempilharia Acesso
-                    if (entrada.lifecycle.currentState == Lifecycle.State.RESUMED) {
-                        navController.popBackStack()
-                    }
-                }
-            )
-        }
-
-        composable<AppRoute.CompletarCadastro> { entrada ->
-            val usuario = usuarioDaRota(autenticacaoViewModel.usuarioLogado) { redirecionarSemSessao(entrada) }
-                ?: return@composable
-            val completarCadastroUiState = autenticacaoViewModel.completarCadastroUiState
-
-            LaunchedEffect(completarCadastroUiState) {
-                if (completarCadastroUiState is CompletarCadastroUiState.Sucesso) {
-                    autenticacaoViewModel.limparCompletarCadastroUiState()
-                    navegarLimpandoPilha(AppRoute.ProjetosLista)
-                }
-            }
-
-            CompletarCadastroScreen(
-                usuario = usuario,
-                completarCadastroUiState = completarCadastroUiState,
-                onSalvarClick = { ra, curso ->
-                    autenticacaoViewModel.completarCadastro(ra, curso)
-                },
-                onSairClick = sair,
-                onErroMostrado = {
-                    autenticacaoViewModel.limparCompletarCadastroUiState()
-                }
-            )
-        }
-
-        // ============================
-        // Agrupamento: Projetos
-        // ============================
-        composable<AppRoute.ProjetosLista> { entrada ->
-            val usuario = usuarioDaRota(autenticacaoViewModel.usuarioLogado) { redirecionarSemSessao(entrada) }
-                ?: return@composable
-
-            // Tela provisória até a feature 2 (Projetos — lista e quadro)
-            InicioScreen(
-                usuario = usuario,
-                onSairClick = sair
-            )
         }
     }
 }

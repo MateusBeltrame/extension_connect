@@ -15,20 +15,26 @@ import androidx.compose.ui.unit.dp
 /**
  * Cartão branco arredondado com sombra suave, usado em `academic-card`, `card` e `card-projeto`
  * do Figma. Encapsula apenas o contêiner — o conteúdo (título, chips, avatares...) é montado
- * no local de uso a partir dos demais componentes de `ui/components/`.
+ * no local de uso a partir dos demais componentes de `ui/components/`. Com [onClick], o cartão inteiro
+ * é clicável (ripple respeita os cantos arredondados).
  */
 @Composable
 fun AppCard(
     modifier: Modifier = Modifier,
     contentPadding: Dp = 16.dp,
+    onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
-    ) {
-        Column(modifier = Modifier.padding(contentPadding), content = content)
+    val shape = RoundedCornerShape(12.dp)
+    val colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    val elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+    if (onClick != null) {
+        Card(onClick = onClick, modifier = modifier, shape = shape, colors = colors, elevation = elevation) {
+            Column(modifier = Modifier.padding(contentPadding), content = content)
+        }
+    } else {
+        Card(modifier = modifier, shape = shape, colors = colors, elevation = elevation) {
+            Column(modifier = Modifier.padding(contentPadding), content = content)
+        }
     }
 }

@@ -156,7 +156,7 @@ private fun ColumnScope.EntrarConteudo(
         AppTextField(
             value = email,
             onValueChange = { email = it; emailErro = null; onCampoAlterado() },
-            placeholder = "usuario@afya.br",
+            placeholder = "Digite seu e-mail",
             label = "E-mail",
             leadingIcon = { IconeCampo(Icons.Outlined.Email) },
             supportingText = emailErro,
@@ -246,10 +246,10 @@ private fun ColumnScope.CadastrarConteudo(
         AppTextField(
             value = email,
             onValueChange = { email = it; emailErro = null; onEmailAlterado() },
-            placeholder = "nome.sobrenome@afya.br",
+            placeholder = "Digite seu e-mail",
             label = "E-mail",
             leadingIcon = { IconeCampo(Icons.Outlined.Email) },
-            supportingText = emailMensagemErro ?: "Use seu e-mail institucional ${ValidacaoAcesso.DOMINIO_INSTITUCIONAL}",
+            supportingText = emailMensagemErro,
             isError = emailMensagemErro != null,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
         )
@@ -292,7 +292,7 @@ private fun ColumnScope.CadastrarConteudo(
             loading = cadastrando,
             onClick = {
                 nomeErro = if (nome.isBlank()) "Nome é obrigatório" else null
-                emailErro = ValidacaoAcesso.erroEmail(email, exigirDominio = true)
+                emailErro = ValidacaoAcesso.erroEmail(email)
                 senhaErro = if (senha.length < ValidacaoAcesso.TAMANHO_MINIMO_SENHA) {
                     "A senha deve ter no mínimo ${ValidacaoAcesso.TAMANHO_MINIMO_SENHA} caracteres"
                 } else null

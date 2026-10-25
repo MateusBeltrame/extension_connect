@@ -1,64 +1,126 @@
 package br.com.mateushb.extensionconnectapp.data.local
 
-import android.content.ContentValues
 import android.content.Context
-import android.database.sqlite.SQLiteDatabase
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import br.com.mateushb.extensionconnectapp.BuildConfig
+import br.com.mateushb.extensionconnectapp.data.local.dao.ProjetoDao
 import br.com.mateushb.extensionconnectapp.data.local.dao.UsuarioDao
+import br.com.mateushb.extensionconnectapp.data.local.entity.EtapaEntity
+import br.com.mateushb.extensionconnectapp.data.local.entity.HistoricoEstagioEntity
+import br.com.mateushb.extensionconnectapp.data.local.entity.ProjetoEntity
+import br.com.mateushb.extensionconnectapp.data.local.entity.ProjetoParticipanteEntity
 import br.com.mateushb.extensionconnectapp.data.local.entity.UsuarioEntity
 
 @Database(
-    entities = [UsuarioEntity::class],
-    version = 1,
+    entities = [
+        UsuarioEntity::class,
+        ProjetoEntity::class,
+        EtapaEntity::class,
+        ProjetoParticipanteEntity::class,
+        HistoricoEstagioEntity::class
+    ],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun usuarioDao(): UsuarioDao
 
+    abstract fun projetoDao(): ProjetoDao
+
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
-        private const val SENHA_PADRAO_SEED = "123456"
-
-        // Contas de teste (senha conhecida): o cadastro só cria alunos e a tela de Pessoas ainda não
-        // existe. Só em build debug — o APK de release nunca nasce com administrador de senha pública
+        // Contas e projetos de teste (senha conhecida). Só em build debug — o APK de release nunca
+        // nasce com administrador de senha pública
         private val SEED_CALLBACK = object : Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
-                inserirUsuarioSeed(db, "Administrador", "admin@afya.br", "ADMINISTRADOR", ativo = true)
-                inserirUsuarioSeed(db, "Professor Demo", "professor@afya.br", "PROFESSOR", ativo = true)
-                inserirUsuarioSeed(
-                    db, "Aluno Inativo", "inativo@afya.br", "ALUNO", ativo = false,
-                    ra = "2023000001", curso = "ENGENHARIA_SOFTWARE"
-                )
+                val senhaHash = SeedDebug.gerarSenhaHashPadrao()
+                SeedDebug.inserirUsuariosIniciais(db, senhaHash)
+                SeedDebug.inserirProjetosExemplo(db, senhaHash)
             }
         }
 
-        private fun inserirUsuarioSeed(
-            db: SupportSQLiteDatabase,
-            nome: String,
-            email: String,
-            perfil: String,
-            ativo: Boolean,
-            ra: String? = null,
-            curso: String? = null
-        ) {
-            val valores = ContentValues().apply {
-                put("nome", nome)
-                put("email", email)
-                put("senha_hash", HashSenha.gerar(SENHA_PADRAO_SEED))
-                put("perfil", perfil)
-                put("ativo", if (ativo) 1 else 0)
-                put("ra", ra)
-                put("curso", curso)
+        // Spec 002: tabelas de leitura da tela Projetos. SQL idêntico ao gerado pelas entities
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `projetos` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `titulo` TEXT NOT NULL,
+                        `nome_grupo` TEXT NOT NULL,
+                        `descricao` TEXT NOT NULL,
+                        `tema` TEXT NOT NULL,
+                        `orientador_id` INTEGER NOT NULL,
+                        `data_inicio` TEXT NOT NULL,
+                        `data_fim_previsto` TEXT NOT NULL,
+                        `estagio` TEXT NOT NULL,
+                        `aplicacao_inicio` TEXT,
+                        `aplicacao_fim` TEXT,
+                        `aplicacao_descricao` TEXT,
+                        `aguardando_ciencia_orientador` INTEGER NOT NULL,
+                        FOREIGN KEY(`orientador_id`) REFERENCES `usuarios`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_projetos_orientador_id` ON `projetos` (`orientador_id`)")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `etapas` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `projeto_id` INTEGER NOT NULL,
+                        `nome` TEXT NOT NULL,
+                        `data_prevista` TEXT NOT NULL,
+                        `concluida` INTEGER NOT NULL,
+                        `ordem` INTEGER NOT NULL,
+                        FOREIGN KEY(`projeto_id`) REFERENCES `projetos`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_etapas_projeto_id` ON `etapas` (`projeto_id`)")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `projeto_participantes` (
+                        `projeto_id` INTEGER NOT NULL,
+                        `aluno_id` INTEGER NOT NULL,
+                        PRIMARY KEY(`projeto_id`, `aluno_id`),
+                        FOREIGN KEY(`projeto_id`) REFERENCES `projetos`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`aluno_id`) REFERENCES `usuarios`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_projeto_participantes_projeto_id` ON `projeto_participantes` (`projeto_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_projeto_participantes_aluno_id` ON `projeto_participantes` (`aluno_id`)")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `historico_estagios` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `projeto_id` INTEGER NOT NULL,
+                        `estagio` TEXT NOT NULL,
+                        `autor_id` INTEGER NOT NULL,
+                        `data` TEXT NOT NULL,
+                        `justificativa` TEXT,
+                        FOREIGN KEY(`projeto_id`) REFERENCES `projetos`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`autor_id`) REFERENCES `usuarios`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_historico_estagios_projeto_id` ON `historico_estagios` (`projeto_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_historico_estagios_autor_id` ON `historico_estagios` (`autor_id`)")
+
+                // Banco debug já existente também recebe os projetos de exemplo
+                if (BuildConfig.DEBUG) SeedDebug.inserirProjetosExemplo(db, SeedDebug.gerarSenhaHashPadrao())
             }
-            db.insert("usuarios", SQLiteDatabase.CONFLICT_ABORT, valores)
         }
 
         fun obterInstancia(context: Context): AppDatabase {
@@ -77,6 +139,7 @@ abstract class AppDatabase : RoomDatabase() {
                 AppDatabase::class.java,
                 "extension_connect_database.db"
             )
+                .addMigrations(MIGRATION_1_2)
             if (BuildConfig.DEBUG) builder.addCallback(SEED_CALLBACK)
             return builder.build()
         }

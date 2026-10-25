@@ -11,6 +11,7 @@ val SurfaceWhite = Color(0xFFFFFFFF)
 val TextSecondaryLight = Color(0xFF4B5563)
 val TextMutedLight = Color(0xFF9CA3AF)
 val OutlineLight = Color(0xFFE5E7EB)
+val NeutralContainerLight = Color(0xFFEEF0F3) // trilha das abas e colunas do quadro (frames 33:2, 33:279)
 val PinkContainerLight = Color(0xFFFDE7F3) // círculo do ícone em "Verifique seu e-mail" (frame 32:284)
 val ErrorRed = Color(0xFFDC2626) // texto/ícone do aviso de erro (frames 32:59 e 32:117)
 val ErrorContainerLight = Color(0xFFFEF2F2) // fundo do aviso de erro
