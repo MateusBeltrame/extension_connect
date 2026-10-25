@@ -4,7 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import br.com.mateushb.extensionconnectapp.login.Login
+import br.com.mateushb.extensionconnectapp.ui.navigation.AppNavHost
 import br.com.mateushb.extensionconnectapp.ui.theme.ExtensionConnectAPPTheme
 
 class MainActivity : ComponentActivity() {
@@ -12,8 +12,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            ExtensionConnectAPPTheme(darkTheme = false, dynamicColor = false) {
-                Login()
+            ExtensionConnectAPPTheme(darkTheme = false) {
+                AppNavHost()
             }
         }
     }
