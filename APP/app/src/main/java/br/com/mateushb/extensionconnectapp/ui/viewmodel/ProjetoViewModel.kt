@@ -36,9 +36,9 @@ import java.util.Locale
 // de um usuário para o outro
 class ProjetoViewModel @JvmOverloads constructor(
     application: Application,
-    private val repository: ProjetoRepository = ProjetoRepository(
-        AppDatabase.obterInstancia(application).projetoDao()
-    ),
+    private val repository: ProjetoRepository = AppDatabase.obterInstancia(application).let {
+        ProjetoRepository(it.projetoDao(), it.usuarioDao())
+    },
     private val preferencesManager: AppPreferencesManager = AppPreferencesManager(application)
 ) : AndroidViewModel(application) {
 

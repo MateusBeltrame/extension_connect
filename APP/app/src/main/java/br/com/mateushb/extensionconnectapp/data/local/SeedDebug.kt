@@ -115,6 +115,55 @@ object SeedDebug {
         )
     }
 
+    // Spec 003: alunos para testar a busca e o limite de 10 participantes do wizard "Novo projeto"
+    // (nomes dos frames 37:267/37:393) e Luciana Freitas presa ao Grupo Sementes, para aparecer
+    // bloqueada. Pode rodar num banco que já tem os projetos de exemplo (migração 2 → 3)
+    fun inserirAlunosNovoProjeto(db: SupportSQLiteDatabase, senhaHash: String) {
+        val hoje = LocalDate.now()
+        val cursos = listOf(
+            "ENGENHARIA_SOFTWARE", "MEDICINA", "ENFERMAGEM", "DIREITO", "ADMINISTRACAO",
+            "CIENCIA_COMPUTACAO", "ODONTOLOGIA", "SISTEMAS_INFORMACAO", "ANALISE_DESENVOLVIMENTO_SISTEMAS"
+        )
+        ALUNOS_NOVO_PROJETO.forEachIndexed { indice, (nome, email) ->
+            inserirUsuario(
+                db, senhaHash, nome, email, "ALUNO",
+                ra = "2025%06d".format(indice + 1), curso = cursos[indice % cursos.size]
+            )
+        }
+
+        // Idempotente: o mesmo banco pode receber o seed pelo onCreate e não deve duplicar o projeto
+        val sementesExiste = db.query("SELECT 1 FROM projetos WHERE nome_grupo = ?", arrayOf("Sementes"))
+            .use { it.moveToFirst() }
+        if (sementesExiste) return
+
+        // Grupo Sementes: em análise; Luciana fica bloqueada na busca do Passo 3
+        inserirProjeto(
+            db, hoje,
+            titulo = "Viveiro de mudas nativas no Parque Municipal",
+            nomeGrupo = "Sementes",
+            tema = "MEIO_AMBIENTE",
+            orientador = "carlos.mendes@afya.br",
+            inicio = -7, fimPrevisto = 80,
+            estagio = "EM_ANALISE",
+            historico = listOf("EM_ANALISE" to -7),
+            etapas = listOf(false, false),
+            participantes = listOf("luciana.freitas@afya.br")
+        )
+    }
+
+    private val ALUNOS_NOVO_PROJETO = listOf(
+        "Lucas Moura" to "lucas.moura@afya.br",
+        "Lúcio Carvalho" to "lucio.carvalho@afya.br",
+        "Caio Rocha" to "caio.rocha@afya.br",
+        "Bianca Nunes" to "bianca.nunes@afya.br",
+        "Diego Vaz" to "diego.vaz@afya.br",
+        "Karen Souza" to "karen.souza@afya.br",
+        "Paula Lins" to "paula.lins@afya.br",
+        "Rafael Dias" to "rafael.dias@afya.br",
+        "Tânia Alves" to "tania.alves@afya.br",
+        "Luciana Freitas" to "luciana.freitas@afya.br"
+    )
+
     private val PROFESSORES = listOf(
         "Ana Ribeiro" to "ana.ribeiro@afya.br",
         "Carlos Mendes" to "carlos.mendes@afya.br",

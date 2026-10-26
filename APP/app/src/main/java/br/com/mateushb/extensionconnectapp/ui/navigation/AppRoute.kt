@@ -18,6 +18,14 @@ sealed interface AppRoute {
     @Serializable
     data object ProjetosLista : AppRoute
 
+    // Wizard de 3 passos: só cria (spec 003)
+    @Serializable
+    data object NovoProjeto : AppRoute
+
+    // Provisória até a feature 4
+    @Serializable
+    data class ProjetoDetalhes(val projetoId: Int) : AppRoute
+
     // Agrupamento de Telas: Pessoas (provisória até a feature 7)
     @Serializable
     data object PessoasLista : AppRoute

@@ -24,7 +24,8 @@ import androidx.compose.ui.unit.dp
  * Reproduz o frame `primary-button` do Figma: largura total, 48dp, fundo rosa, rótulo branco em negrito.
  * Com [loading] mostra um indicador de progresso no lugar do rótulo, mantém a cor da marca e
  * ignora toques. [leadingIcon] (18dp) e `fullWidth = false` reproduzem o botão "+ Criar projeto" do
- * estado vazio de Projetos (frame 33:200), que acompanha a largura do conteúdo.
+ * estado vazio de Projetos (frame 33:200), que acompanha a largura do conteúdo. [trailingIcon] é a
+ * seta de "Avançar →" do wizard "Novo projeto" (frame 37:2).
  */
 @Composable
 fun PrimaryButton(
@@ -34,7 +35,8 @@ fun PrimaryButton(
     enabled: Boolean = true,
     loading: Boolean = false,
     leadingIcon: ImageVector? = null,
-    fullWidth: Boolean = true
+    fullWidth: Boolean = true,
+    trailingIcon: ImageVector? = null
 ) {
     Button(
         onClick = onClick,
@@ -60,6 +62,7 @@ fun PrimaryButton(
             ) {
                 leadingIcon?.let { Icon(imageVector = it, contentDescription = null, modifier = Modifier.size(18.dp)) }
                 Text(text, style = MaterialTheme.typography.labelLarge)
+                trailingIcon?.let { Icon(imageVector = it, contentDescription = null, modifier = Modifier.size(18.dp)) }
             }
         }
     }
