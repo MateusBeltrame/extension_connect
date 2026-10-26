@@ -11,6 +11,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -20,7 +21,8 @@ import androidx.compose.ui.unit.dp
  * do Figma. Encapsula apenas o contêiner — o conteúdo (título, chips, avatares...) é montado
  * no local de uso a partir dos demais componentes de `ui/components/`. Com [onClick], o cartão inteiro
  * é clicável (ripple respeita os cantos arredondados). [containerColor] e [border] mudam o fundo e
- * a borda (ex.: card rosa "Orientação do professor" do diário, frame 35:2).
+ * a borda (ex.: card rosa "Orientação do professor" do diário, frame 35:2). [shape] troca os cantos
+ * (ex.: cada linha da lista de Pessoas é um pedaço do mesmo card, frame 36:2).
  */
 @Composable
 fun AppCard(
@@ -29,9 +31,9 @@ fun AppCard(
     onClick: (() -> Unit)? = null,
     containerColor: Color = Color.Unspecified,
     border: BorderStroke? = null,
+    shape: Shape = RoundedCornerShape(12.dp),
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val shape = RoundedCornerShape(12.dp)
     val colors = CardDefaults.cardColors(containerColor = containerColor.takeOrElse { MaterialTheme.colorScheme.surface })
     val elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     if (onClick != null) {

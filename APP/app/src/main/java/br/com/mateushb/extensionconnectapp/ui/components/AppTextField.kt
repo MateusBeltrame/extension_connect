@@ -46,6 +46,10 @@ import br.com.mateushb.extensionconnectapp.ui.theme.WarningAmber
  * maior com `singleLine = false` faz a área de várias linhas (Descrição, 110dp), com o texto no topo;
  * [isWarning] usa a borda laranja do aviso de data (frame 37:109); `enabled = false` é a busca
  * bloqueada no limite de participantes (fundo cinza, frame 37:393).
+ *
+ * [locked] (spec 007): campo que a regra não deixa editar — o texto também fica cinza (e-mail e perfil
+ * do próprio cadastro em "Editar pessoa", frames 36:175 e 36:420). Só `enabled = false` (ex.: enquanto
+ * salva) mantém o texto escuro, para não parecer que o valor sumiu.
  */
 @Composable
 fun AppTextField(
@@ -65,7 +69,8 @@ fun AppTextField(
     enabled: Boolean = true,
     height: Dp = 44.dp,
     counter: String? = null,
-    isWarning: Boolean = false
+    isWarning: Boolean = false,
+    locked: Boolean = false
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val focado by interactionSource.collectIsFocusedAsState()
@@ -91,7 +96,9 @@ fun AppTextField(
             visualTransformation = visualTransformation,
             keyboardOptions = keyboardOptions,
             interactionSource = interactionSource,
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                color = if (locked) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
+            ),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             decorationBox = { campo ->
                 Row(
@@ -99,11 +106,11 @@ fun AppTextField(
                         .fillMaxWidth()
                         .height(height)
                         .background(
-                            if (enabled) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.background,
+                            if (enabled && !locked) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.background,
                             RoundedCornerShape(8.dp)
                         )
                         .border(1.dp, corBorda, RoundedCornerShape(8.dp))
-                        .then(if (onClick != null && enabled) Modifier.clickable(onClick = onClick) else Modifier)
+                        .then(if (onClick != null && enabled && !locked) Modifier.clickable(onClick = onClick) else Modifier)
                         .padding(horizontal = 12.dp, vertical = if (singleLine) 0.dp else 12.dp),
                     verticalAlignment = if (singleLine) Alignment.CenterVertically else Alignment.Top,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)

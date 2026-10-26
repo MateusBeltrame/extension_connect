@@ -290,7 +290,3 @@ private fun NomeEEmail(usuario: Usuario) {
         )
     }
 }
-
-// Termo já normalizado (ProjetoResumo.normalizar)
-internal fun Usuario.correspondeABusca(termo: String): Boolean =
-    ProjetoResumo.normalizar(nome).contains(termo) || ProjetoResumo.normalizar(email).contains(termo)

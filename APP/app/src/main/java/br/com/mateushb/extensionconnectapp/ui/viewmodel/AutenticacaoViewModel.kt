@@ -19,6 +19,9 @@ import br.com.mateushb.extensionconnectapp.ui.state.LoginUiState
 import br.com.mateushb.extensionconnectapp.ui.state.RecuperarSenhaUiState
 import br.com.mateushb.extensionconnectapp.ui.state.SessaoUiState
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 
 class AutenticacaoViewModel @JvmOverloads constructor(
@@ -51,6 +54,8 @@ class AutenticacaoViewModel @JvmOverloads constructor(
     val usuarioLogado: Usuario?
         get() = (sessaoUiState as? SessaoUiState.Autenticado)?.usuario
 
+    private var observacaoSessaoJob: Job? = null
+
     init {
         verificarSessao()
     }
@@ -71,6 +76,7 @@ class AutenticacaoViewModel @JvmOverloads constructor(
                     preferencesManager.limparSessao()
                     SessaoUiState.NaoAutenticado
                 } else {
+                    observarUsuarioLogado(usuario.id)
                     SessaoUiState.Autenticado(usuario)
                 }
             } catch (e: CancellationException) {
@@ -84,9 +90,29 @@ class AutenticacaoViewModel @JvmOverloads constructor(
     private fun iniciarSessao(usuario: Usuario) {
         preferencesManager.salvarUsuarioLogadoId(usuario.id)
         sessaoUiState = SessaoUiState.Autenticado(usuario)
+        observarUsuarioLogado(usuario.id)
+    }
+
+    // A sessão acompanha a própria linha no banco: qualquer tela que altere o usuário logado (nome em
+    // "Editar pessoa", spec 007; "Meu perfil" na feature 8) vale no app inteiro sem sair e entrar de
+    // novo. Linha apagada ou desativada não derruba a sessão aqui (o próximo acesso já recusa)
+    private fun observarUsuarioLogado(usuarioId: Int) {
+        observacaoSessaoJob?.cancel()
+        observacaoSessaoJob = viewModelScope.launch {
+            repository.observarPorId(usuarioId)
+                .filterNotNull()
+                .catch { /* Falha de leitura mantém o último usuário conhecido */ }
+                .collect { usuario ->
+                    if (usuarioLogado?.id == usuario.id && usuario.ativo && usuario != usuarioLogado) {
+                        sessaoUiState = SessaoUiState.Autenticado(usuario)
+                    }
+                }
+        }
     }
 
     fun sair() {
+        observacaoSessaoJob?.cancel()
+        observacaoSessaoJob = null
         preferencesManager.limparSessao()
         sessaoUiState = SessaoUiState.NaoAutenticado
         loginUiState = LoginUiState.Ocioso
@@ -133,7 +159,7 @@ class AutenticacaoViewModel @JvmOverloads constructor(
                 if (repository.emailJaCadastrado(email)) {
                     CadastroUiState.EmailJaCadastrado
                 } else {
-                    iniciarSessao(repository.cadastrarAluno(nome, email, senha))
+                    iniciarSessao(repository.cadastrar(nome, email, senha))
                     CadastroUiState.Sucesso
                 }
             } catch (e: CancellationException) {

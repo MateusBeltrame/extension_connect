@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,13 +56,16 @@ import br.com.mateushb.extensionconnectapp.ui.state.SalvarProjetoUiState
 import br.com.mateushb.extensionconnectapp.ui.state.SessaoUiState
 import br.com.mateushb.extensionconnectapp.ui.telas.AcessoScreen
 import br.com.mateushb.extensionconnectapp.ui.telas.CompletarCadastroScreen
+import br.com.mateushb.extensionconnectapp.ui.telas.EditarPessoaScreen
 import br.com.mateushb.extensionconnectapp.ui.telas.EmBreveScreen
 import br.com.mateushb.extensionconnectapp.ui.telas.NovoProjetoScreen
+import br.com.mateushb.extensionconnectapp.ui.telas.PessoasListaScreen
 import br.com.mateushb.extensionconnectapp.ui.telas.ProjetoDetalhesScreen
 import br.com.mateushb.extensionconnectapp.ui.telas.ProjetosListaScreen
 import br.com.mateushb.extensionconnectapp.ui.telas.RecuperarSenhaScreen
 import br.com.mateushb.extensionconnectapp.ui.viewmodel.AutenticacaoViewModel
 import br.com.mateushb.extensionconnectapp.ui.viewmodel.NovoProjetoViewModel
+import br.com.mateushb.extensionconnectapp.ui.viewmodel.PessoaViewModel
 import br.com.mateushb.extensionconnectapp.ui.viewmodel.ProjetoDetalhesViewModel
 import br.com.mateushb.extensionconnectapp.ui.viewmodel.ProjetoViewModel
 
@@ -379,7 +383,7 @@ fun AppNavHost(
             }
 
             // ============================
-            // Agrupamento: Pessoas, Perfil e Mural (provisórias)
+            // Agrupamento: Pessoas (spec 007)
             // ============================
             composable<AppRoute.PessoasLista> { entrada ->
                 val usuario = usuarioDaRota(autenticacaoViewModel.usuarioLogado) { redirecionarSemSessao(entrada) }
@@ -390,9 +394,81 @@ fun AppNavHost(
                     LaunchedEffect(Unit) { navegarLimpandoPilha(AppRoute.ProjetosLista) }
                     return@composable
                 }
-                ComBottomBar(alturaBottomBar) { EmBreveScreen(titulo = "Pessoas") }
+
+                val pessoaViewModel: PessoaViewModel = viewModel()
+                // Snackbar de quem voltou de "Editar pessoa" depois de salvar (gravado no savedStateHandle
+                // desta entrada); a lista em si é reativa e já mostra os dados novos
+                val mensagem by entrada.savedStateHandle
+                    .getStateFlow<String?>(CHAVE_MENSAGEM_PESSOAS, null)
+                    .collectAsState()
+
+                LaunchedEffect(Unit) {
+                    pessoaViewModel.carregarPessoas()
+                }
+
+                ComBottomBar(alturaBottomBar) {
+                    PessoasListaScreen(
+                        listaUiState = pessoaViewModel.listaUiState,
+                        busca = pessoaViewModel.busca,
+                        filtroAtual = pessoaViewModel.filtroAtual,
+                        mensagem = mensagem,
+                        onBuscaChange = { pessoaViewModel.alterarBusca(it) },
+                        onFiltroChange = { pessoaViewModel.aplicarFiltro(it) },
+                        onPessoaClick = { usuarioId ->
+                            navController.navigate(AppRoute.EditarPessoa(usuarioId)) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onTentarNovamente = { pessoaViewModel.carregarPessoas() },
+                        onMensagemMostrada = { entrada.savedStateHandle[CHAVE_MENSAGEM_PESSOAS] = null }
+                    )
+                }
             }
 
+            composable<AppRoute.EditarPessoa> { entrada ->
+                val usuario = usuarioDaRota(autenticacaoViewModel.usuarioLogado) { redirecionarSemSessao(entrada) }
+                    ?: return@composable
+
+                if (usuario.perfil != PerfilUsuario.ADMINISTRADOR) {
+                    LaunchedEffect(Unit) { navegarLimpandoPilha(AppRoute.ProjetosLista) }
+                    return@composable
+                }
+
+                val usuarioId = entrada.toRoute<AppRoute.EditarPessoa>().usuarioId
+                val pessoaViewModel: PessoaViewModel = viewModel()
+
+                // Na rotação o ViewModel ignora o mesmo id, para não apagar o que foi digitado
+                LaunchedEffect(usuarioId) {
+                    pessoaViewModel.carregarPessoa(usuarioId)
+                }
+
+                EditarPessoaScreen(
+                    usuario = usuario,
+                    formularioUiState = pessoaViewModel.formularioUiState,
+                    salvarUiState = pessoaViewModel.salvarUiState,
+                    onSalvarClick = { pessoaViewModel.salvar(usuario, it) },
+                    onVoltarClick = { voltarSeAtiva(navController, entrada) },
+                    onTentarNovamente = { pessoaViewModel.carregarPessoa(usuarioId) },
+                    // O próprio cadastro (HU-05) chega à sessão sozinho: o AutenticacaoViewModel observa a linha
+                    onSalvoComSucesso = {
+                        pessoaViewModel.limparSalvarUiState()
+                        // Só sai (e só avisa a lista) se esta ainda for a entrada do topo: senão a mensagem
+                        // cairia numa entrada que não é a lista, ou num Snackbar fora de hora
+                        if (navController.currentBackStackEntry?.id == entrada.id) {
+                            navController.previousBackStackEntry?.savedStateHandle?.set(
+                                CHAVE_MENSAGEM_PESSOAS, "Pessoa atualizada com sucesso"
+                            )
+                            navController.popBackStack()
+                        }
+                    },
+                    onSalvarMensagemMostrada = { pessoaViewModel.limparSalvarUiState() },
+                    onRecarregarBloqueios = { pessoaViewModel.recarregarBloqueios() }
+                )
+            }
+
+            // ============================
+            // Agrupamento: Perfil e Mural (provisórias)
+            // ============================
             composable<AppRoute.MeuPerfil> { entrada ->
                 usuarioDaRota(autenticacaoViewModel.usuarioLogado) { redirecionarSemSessao(entrada) }
                     ?: return@composable
@@ -411,6 +487,9 @@ fun AppNavHost(
         }
     }
 }
+
+// Snackbar "Pessoa atualizada com sucesso", passado de EditarPessoa para PessoasLista
+private const val CHAVE_MENSAGEM_PESSOAS = "mensagemPessoas"
 
 // ===== BottomBar =====
 

@@ -26,9 +26,13 @@ sealed interface AppRoute {
     @Serializable
     data class ProjetoDetalhes(val projetoId: Int) : AppRoute
 
-    // Agrupamento de Telas: Pessoas (provisória até a feature 7)
+    // Agrupamento de Telas: Pessoas (spec 007, só Administrador)
     @Serializable
     data object PessoasLista : AppRoute
+
+    // Só edita: não há "nova pessoa" (cadastro é pelo "Cadastrar-se")
+    @Serializable
+    data class EditarPessoa(val usuarioId: Int) : AppRoute
 
     // Agrupamento de Telas: Perfil (provisória até a feature 8)
     @Serializable
