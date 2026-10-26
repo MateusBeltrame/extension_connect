@@ -44,4 +44,18 @@ data class ProjetoDetalhes(
     fun podeConfirmarCiencia(usuario: Usuario): Boolean = projeto.aguardandoCienciaOrientador && ehGestor(usuario)
 
     fun podeMarcarEtapa(usuario: Usuario): Boolean = !somenteLeitura && (ehGestor(usuario) || ehParticipante(usuario))
+
+    // ===== Diário (spec 005) =====
+
+    // O tipo vem do papel: participante registra Atividade, orientador registra Orientação.
+    // Administrador e professor que não orienta só leem; Finalizado é somente leitura (null = não publica)
+    fun tipoRegistroPara(usuario: Usuario): TipoRegistro? = when {
+        somenteLeitura -> null
+        ehOrientador(usuario) -> TipoRegistro.ORIENTACAO
+        ehParticipante(usuario) -> TipoRegistro.ATIVIDADE
+        else -> null
+    }
+
+    fun podeExcluirRegistro(usuario: Usuario, registro: RegistroDiario): Boolean =
+        !somenteLeitura && registro.autorId == usuario.id && registro.projetoId == projeto.id
 }

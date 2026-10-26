@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.database.sqlite.SQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 
@@ -149,6 +150,72 @@ object SeedDebug {
             etapas = listOf(false, false),
             participantes = listOf("luciana.freitas@afya.br")
         )
+    }
+
+    // Spec 005: registros do frame 35:2 no Grupo Raízes, uma atividade no Futuro e uma no Sorriso
+    // (finalizado, para conferir o modo leitura). Conecta fica sem registros e continua parado.
+    // Pode rodar num banco que já tem os projetos (migração 3 → 4)
+    fun inserirRegistrosDiario(db: SupportSQLiteDatabase) {
+        // Idempotente: onCreate e migração não duplicam o diário
+        val jaTemRegistros = db.query("SELECT 1 FROM registros_diario LIMIT 1").use { it.moveToFirst() }
+        if (jaTemRegistros) return
+
+        val agora = LocalDateTime.now()
+        val hoje = agora.toLocalDate()
+        // "Hoje, 14:20" do Figma, sem ficar no futuro quando o seed roda de manhã
+        val hojeAs1420 = minOf(hoje.atTime(14, 20), agora.minusMinutes(1))
+
+        inserirRegistro(
+            db, "Raízes", "julia.lima@afya.br", hoje.minusDays(12).atTime(10, 30), "ATIVIDADE", "Aplicação",
+            "Reunião com a coordenação pedagógica para definir os horários das próximas oficinas."
+        )
+        inserirRegistro(
+            db, "Raízes", "ana.ribeiro@afya.br", hoje.minusDays(1).atTime(18, 5), "ORIENTACAO", "Relatório final",
+            "Lembrem de registrar fotos autorizadas das oficinas e começar o relatório final até sexta."
+        )
+        inserirRegistro(
+            db, "Raízes", "aluno@afya.br", hojeAs1420, "ATIVIDADE", "Aplicação",
+            "Realizamos a segunda oficina de plantio com a turma do 4º ano. As mudas de alface e cenoura " +
+                "foram para os canteiros."
+        )
+        inserirRegistro(
+            db, "Futuro", "diego.vieira@afya.br", hoje.minusDays(2).atTime(16, 0), "ATIVIDADE", "Aplicação",
+            "Primeiro encontro com os jovens aprendizes: apresentamos o orçamento pessoal e a planilha de gastos."
+        )
+        inserirRegistro(
+            db, "Sorriso", "aluno@afya.br", hoje.minusDays(25).atTime(9, 15), "ATIVIDADE", null,
+            "Entregamos os kits de escovação nas três creches e combinamos a visita de retorno."
+        )
+    }
+
+    // Projeto, autor e etapa pelo nome/e-mail; sem o projeto ou o autor (seed de outra versão, conta
+    // alterada à mão), não grava. Não usa idPorEmail, que lança exceção e abortaria a migração
+    private fun inserirRegistro(
+        db: SupportSQLiteDatabase,
+        nomeGrupo: String,
+        autor: String,
+        momento: LocalDateTime,
+        tipo: String,
+        etapa: String?,
+        texto: String
+    ) {
+        val projetoId = db.query("SELECT id FROM projetos WHERE nome_grupo = ?", arrayOf(nomeGrupo))
+            .use { if (it.moveToFirst()) it.getLong(0) else null } ?: return
+        val autorId = db.query("SELECT id FROM usuarios WHERE email = ?", arrayOf(autor))
+            .use { if (it.moveToFirst()) it.getLong(0) else null } ?: return
+        val etapaId = etapa?.let { nome ->
+            db.query("SELECT id FROM etapas WHERE projeto_id = ? AND nome = ?", arrayOf<Any>(projetoId, nome))
+                .use { if (it.moveToFirst()) it.getLong(0) else null }
+        }
+        val registro = ContentValues().apply {
+            put("projeto_id", projetoId)
+            put("autor_id", autorId)
+            put("data", momento.atZone(ZoneId.systemDefault()).toInstant().toString())
+            put("tipo", tipo)
+            put("etapa_id", etapaId)
+            put("texto", texto)
+        }
+        db.insert("registros_diario", SQLiteDatabase.CONFLICT_ABORT, registro)
     }
 
     private val ALUNOS_NOVO_PROJETO = listOf(

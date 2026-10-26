@@ -325,6 +325,7 @@ fun AppNavHost(
 
                 LaunchedEffect(projetoId) {
                     detalhesViewModel.carregarDetalhesProjeto(projetoId)
+                    detalhesViewModel.carregarDiario(projetoId)
                 }
 
                 // Permissões de estágio, ciência e etapa são conferidas com o usuário logado (spec 004)
@@ -341,7 +342,16 @@ fun AppNavHost(
                     onConfirmarCiencia = { detalhesViewModel.confirmarCiencia(usuario) },
                     onAlternarEtapa = { detalhesViewModel.alternarEtapa(usuario, it) },
                     onMudarEstagioMensagemMostrada = { detalhesViewModel.limparMudarEstagioUiState() },
-                    onAcaoMensagemMostrada = { detalhesViewModel.limparAcaoUiState() }
+                    onAcaoMensagemMostrada = { detalhesViewModel.limparAcaoUiState() },
+                    // Diário (spec 005): quem publica e quem exclui também são conferidos com o usuário logado
+                    listaRegistrosUiState = detalhesViewModel.listaRegistrosUiState,
+                    salvarRegistroUiState = detalhesViewModel.salvarRegistroUiState,
+                    exclusaoRegistroUiState = detalhesViewModel.exclusaoRegistroUiState,
+                    onPublicarRegistro = { texto, etapaId -> detalhesViewModel.publicarRegistro(usuario, texto, etapaId) },
+                    onExcluirRegistro = { detalhesViewModel.excluirRegistro(usuario, it) },
+                    onTentarNovamenteDiario = { detalhesViewModel.carregarDiario(projetoId) },
+                    onSalvarRegistroMensagemMostrada = { detalhesViewModel.limparSalvarRegistroUiState() },
+                    onExclusaoRegistroMensagemMostrada = { detalhesViewModel.limparExclusaoRegistroUiState() }
                 )
             }
 

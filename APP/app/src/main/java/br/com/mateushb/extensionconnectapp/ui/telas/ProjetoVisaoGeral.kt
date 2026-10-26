@@ -312,7 +312,7 @@ private fun LinhaHistorico(evento: EventoHistorico, maisRecente: Boolean) {
     }
 }
 
-// ===== Abas Diário e Arquivos (features 5 e 6) =====
+// ===== Aba Arquivos (feature 6) =====
 
 @Composable
 internal fun AbaEmBreve() {

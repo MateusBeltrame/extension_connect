@@ -8,11 +8,13 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import br.com.mateushb.extensionconnectapp.BuildConfig
 import br.com.mateushb.extensionconnectapp.data.local.dao.ProjetoDao
+import br.com.mateushb.extensionconnectapp.data.local.dao.RegistroDiarioDao
 import br.com.mateushb.extensionconnectapp.data.local.dao.UsuarioDao
 import br.com.mateushb.extensionconnectapp.data.local.entity.EtapaEntity
 import br.com.mateushb.extensionconnectapp.data.local.entity.HistoricoEstagioEntity
 import br.com.mateushb.extensionconnectapp.data.local.entity.ProjetoEntity
 import br.com.mateushb.extensionconnectapp.data.local.entity.ProjetoParticipanteEntity
+import br.com.mateushb.extensionconnectapp.data.local.entity.RegistroDiarioEntity
 import br.com.mateushb.extensionconnectapp.data.local.entity.UsuarioEntity
 
 @Database(
@@ -21,9 +23,10 @@ import br.com.mateushb.extensionconnectapp.data.local.entity.UsuarioEntity
         ProjetoEntity::class,
         EtapaEntity::class,
         ProjetoParticipanteEntity::class,
-        HistoricoEstagioEntity::class
+        HistoricoEstagioEntity::class,
+        RegistroDiarioEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -31,6 +34,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun usuarioDao(): UsuarioDao
 
     abstract fun projetoDao(): ProjetoDao
+
+    abstract fun registroDiarioDao(): RegistroDiarioDao
 
     companion object {
         @Volatile
@@ -45,6 +50,7 @@ abstract class AppDatabase : RoomDatabase() {
                 SeedDebug.inserirUsuariosIniciais(db, senhaHash)
                 SeedDebug.inserirProjetosExemplo(db, senhaHash)
                 SeedDebug.inserirAlunosNovoProjeto(db, senhaHash)
+                SeedDebug.inserirRegistrosDiario(db)
             }
         }
 
@@ -132,6 +138,40 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Spec 005: diário do projeto. SQL idêntico ao gerado pela RegistroDiarioEntity
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `registros_diario` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `projeto_id` INTEGER NOT NULL,
+                        `autor_id` INTEGER NOT NULL,
+                        `data` TEXT NOT NULL,
+                        `tipo` TEXT NOT NULL,
+                        `etapa_id` INTEGER,
+                        `texto` TEXT NOT NULL,
+                        FOREIGN KEY(`projeto_id`) REFERENCES `projetos`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`autor_id`) REFERENCES `usuarios`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`etapa_id`) REFERENCES `etapas`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_registros_diario_projeto_id` ON `registros_diario` (`projeto_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_registros_diario_autor_id` ON `registros_diario` (`autor_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_registros_diario_etapa_id` ON `registros_diario` (`etapa_id`)")
+
+                // Banco debug já existente também recebe os registros de exemplo
+                if (BuildConfig.DEBUG) {
+                    try {
+                        SeedDebug.inserirRegistrosDiario(db)
+                    } catch (_: Exception) {
+                        // Dados de teste nunca derrubam a migração de schema: o diário só fica sem exemplos
+                    }
+                }
+            }
+        }
+
         fun obterInstancia(context: Context): AppDatabase {
             // Confere de novo dentro do lock: duas threads podem ter visto INSTANCE nulo
             return INSTANCE ?: synchronized(this) {
@@ -148,7 +188,7 @@ abstract class AppDatabase : RoomDatabase() {
                 AppDatabase::class.java,
                 "extension_connect_database.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             if (BuildConfig.DEBUG) builder.addCallback(SEED_CALLBACK)
             return builder.build()
         }

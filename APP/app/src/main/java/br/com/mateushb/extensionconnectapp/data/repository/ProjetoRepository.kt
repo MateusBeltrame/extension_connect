@@ -19,6 +19,7 @@ import br.com.mateushb.extensionconnectapp.model.ResultadoMudancaEstagio
 import br.com.mateushb.extensionconnectapp.model.ResultadoSalvarProjeto
 import br.com.mateushb.extensionconnectapp.model.TransicaoEstagio
 import br.com.mateushb.extensionconnectapp.model.Usuario
+import br.com.mateushb.extensionconnectapp.model.lerInstanteIso
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -41,7 +42,13 @@ class ProjetoRepository(
         } else {
             projetoDao.observarProjetosCompletos()
         }
-        return origem.map { lista -> lista.map { it.toProjetoResumo() } }
+        // O diário entra só aqui (regra "parado", spec 005): uma consulta leve, sem os textos
+        return combine(origem, projetoDao.observarDatasDiario()) { lista, datasDiario ->
+            val ultimaPorProjeto = datasDiario
+                .groupBy { it.projetoId }
+                .mapValues { (_, datas) -> datas.maxByOrNull { lerInstanteIso(it.data) ?: Instant.MIN }?.data }
+            lista.map { it.toProjetoResumo(ultimaPorProjeto[it.projeto.id]) }
+        }
     }
 
     // ===== Wizard "Novo projeto" (spec 003) =====

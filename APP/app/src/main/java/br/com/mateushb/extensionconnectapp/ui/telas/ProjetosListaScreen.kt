@@ -484,16 +484,17 @@ internal fun ChipComIcone(label: String, tone: StatusTone, icone: ImageVector) {
 }
 
 // Chip selecionável (filtros do bottom sheet e atalhos do quadro): rosa com check quando selecionado,
-// contornado quando não (frames 33:279 e 33:605)
+// contornado quando não (frames 33:279 e 33:605). Os chips do diário (35:2) não mostram o check
 @Composable
 internal fun ChipFiltro(
     label: String,
     selecionado: Boolean,
     onClick: () -> Unit,
     icone: ImageVector? = null,
-    tamanhoTexto: TextUnit = 12.sp
+    tamanhoTexto: TextUnit = 12.sp,
+    mostrarCheck: Boolean = true
 ) {
-    val iconeExibido = if (selecionado) Icons.Outlined.Check else icone
+    val iconeExibido = if (selecionado && mostrarCheck) Icons.Outlined.Check else icone
     // Sem a área mínima de toque de 48dp do M3: o chip ficaria desalinhado dos chips informativos (32dp)
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
         FilterChip(
