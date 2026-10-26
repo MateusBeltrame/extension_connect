@@ -20,10 +20,10 @@ object SeedDebug {
 
     // As 3 contas da spec 001 (banco novo)
     fun inserirUsuariosIniciais(db: SupportSQLiteDatabase, senhaHash: String) {
-        inserirUsuario(db, senhaHash, "Administrador", "admin@afya.br", "ADMINISTRADOR")
-        inserirUsuario(db, senhaHash, "Professor Demo", "professor@afya.br", "PROFESSOR")
+        inserirUsuario(db, senhaHash, "Administrador", "admin@alunos.afya.com.br", "ADMINISTRADOR")
+        inserirUsuario(db, senhaHash, "Professor Demo", "professor@alunos.afya.com.br", "PROFESSOR")
         inserirUsuario(
-            db, senhaHash, "Aluno Inativo", "inativo@afya.br", "ALUNO", ativo = false,
+            db, senhaHash, "Aluno Inativo", "inativo@alunos.afya.com.br", "ALUNO", ativo = false,
             ra = "2023000001", curso = "ENGENHARIA_SOFTWARE"
         )
     }
