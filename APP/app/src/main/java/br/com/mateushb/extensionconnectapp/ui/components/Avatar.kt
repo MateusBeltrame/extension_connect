@@ -22,7 +22,8 @@ import androidx.compose.ui.unit.sp
 /**
  * Avatar circular com iniciais, frame `avatar` do Figma. O tamanho da fonte acompanha [size]
  * para caber tanto no avatar de lista (40dp) quanto no avatar pequeno de [AvatarStack] (26dp).
- * [containerColor] troca só o fundo (ex.: avatar branco no card de orientação do diário, frame 35:2).
+ * [containerColor] troca só o fundo (ex.: avatar branco no card de orientação do diário, frame 35:2) e
+ * [contentColor] só as iniciais (ex.: pessoa inativa em cinza claro, frame 36:2).
  */
 @Composable
 fun Avatar(
@@ -30,13 +31,14 @@ fun Avatar(
     modifier: Modifier = Modifier,
     tone: StatusTone = StatusTone.Neutral,
     size: Dp = 40.dp,
-    containerColor: Color = tone.container
+    containerColor: Color = tone.container,
+    contentColor: Color = tone.onContainer
 ) {
     Box(
         modifier = modifier.size(size).clip(CircleShape).background(containerColor),
         contentAlignment = Alignment.Center
     ) {
-        Text(text = initials, color = tone.onContainer, fontWeight = FontWeight.Bold, fontSize = (size.value * 0.35f).sp)
+        Text(text = initials, color = contentColor, fontWeight = FontWeight.Bold, fontSize = (size.value * 0.35f).sp)
     }
 }
 

@@ -29,7 +29,8 @@ import androidx.compose.ui.unit.sp
  * estado vazio de Projetos (frame 33:200), que acompanha a largura do conteúdo. [trailingIcon] é a
  * seta de "Avançar →" do wizard "Novo projeto" (frame 37:2). [compact] é a variante de 40dp dos
  * botões lado a lado do card de resumo dos detalhes ("Confirmar ciência", frame 34:2): rótulo 14sp,
- * ícone 16dp e respiro lateral de 12dp, para dois botões caberem na largura do card.
+ * ícone 16dp e respiro lateral de 12dp, para dois botões caberem na largura do card. [destructive]
+ * troca o rosa pelo vermelho de `error` ("Desativar" do diálogo 10b, frame 36:254).
  */
 @Composable
 fun PrimaryButton(
@@ -41,8 +42,10 @@ fun PrimaryButton(
     leadingIcon: ImageVector? = null,
     fullWidth: Boolean = true,
     trailingIcon: ImageVector? = null,
-    compact: Boolean = false
+    compact: Boolean = false,
+    destructive: Boolean = false
 ) {
+    val corFundo = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     val tamanhoIcone = if (compact) 16.dp else 18.dp
     Button(
         onClick = onClick,
@@ -50,8 +53,8 @@ fun PrimaryButton(
         enabled = enabled && !loading,
         shape = RoundedCornerShape(8.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            disabledContainerColor = if (loading) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+            containerColor = corFundo,
+            disabledContainerColor = if (loading) corFundo else MaterialTheme.colorScheme.outlineVariant
         ),
         contentPadding = if (compact) PaddingValues(horizontal = 12.dp) else ButtonDefaults.ContentPadding
     ) {
