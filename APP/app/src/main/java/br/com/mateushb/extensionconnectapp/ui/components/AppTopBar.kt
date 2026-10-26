@@ -32,7 +32,8 @@ import br.com.mateushb.extensionconnectapp.ui.theme.InkDark
  * opcional à esquerda e até uma ação à direita (ex.: filtro, busca). O gradiente se estende por trás
  * da status bar (edge-to-edge), como no [GradientHeader]. [navigationIcon] (ex.: X do wizard "Novo
  * projeto", frame 37:2) recebe um `IconButton` de 48dp: o ícone fica a 20dp da borda e o título logo
- * depois, como no Figma.
+ * depois, como no Figma. [compactTitle] usa o título de 16sp em até 2 linhas, para o título do
+ * projeto na aba Diário (frame 35:2).
  */
 @Composable
 fun AppTopBar(
@@ -40,6 +41,7 @@ fun AppTopBar(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     navigationIcon: (@Composable () -> Unit)? = null,
+    compactTitle: Boolean = false,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
     Row(
@@ -62,9 +64,13 @@ fun AppTopBar(
                 Text(
                     text = title,
                     color = Color.White,
-                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontSize = if (compactTitle) 16.sp else 20.sp,
+                        lineHeight = if (compactTitle) 20.sp else MaterialTheme.typography.titleLarge.lineHeight,
+                        fontWeight = FontWeight.Bold
+                    ),
                     // Título dinâmico (ex.: título do projeto, até 100 caracteres) não quebra a barra
-                    maxLines = 1,
+                    maxLines = if (compactTitle) 2 else 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 if (subtitle != null) {

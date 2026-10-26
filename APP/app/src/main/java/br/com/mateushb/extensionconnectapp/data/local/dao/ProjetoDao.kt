@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
 import br.com.mateushb.extensionconnectapp.data.local.ConflitoNovoProjeto
+import br.com.mateushb.extensionconnectapp.data.local.entity.DataRegistroDiario
 import br.com.mateushb.extensionconnectapp.data.local.entity.EtapaEntity
 import br.com.mateushb.extensionconnectapp.data.local.entity.HistoricoEstagioEntity
 import br.com.mateushb.extensionconnectapp.data.local.entity.ParticipacaoAtiva
@@ -32,6 +33,11 @@ interface ProjetoDao {
     @Transaction
     @Query("SELECT * FROM projetos WHERE id = :id")
     fun observarProjetoCompletoPorId(id: Int): Flow<ProjetoComRelacoes?>
+
+    // Datas do diário para a regra "parado" (spec 005). Sem MAX no SQL: o texto ISO muda de tamanho
+    // com a fração de segundo e não ordena certo; o Repository compara como Instant
+    @Query("SELECT projeto_id, data FROM registros_diario")
+    fun observarDatasDiario(): Flow<List<DataRegistroDiario>>
 
     // Aluno só pode estar em um projeto não finalizado por vez (05-dominio.md)
     @Query(

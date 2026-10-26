@@ -14,7 +14,9 @@ data class ProjetoResumo(
     val participantes: List<Usuario> = emptyList(),
     val etapas: List<Etapa> = emptyList(),
     // Instant ISO da última linha do histórico de estágio
-    val dataUltimaMudancaEstagio: String? = null
+    val dataUltimaMudancaEstagio: String? = null,
+    // Instant ISO do registro de diário mais recente (spec 005); null = diário vazio
+    val dataUltimoRegistroDiario: String? = null
 ) {
     val etapasConcluidas: Int
         get() = etapas.count { it.concluida }
@@ -36,10 +38,15 @@ data class ProjetoResumo(
         return projeto.estagio == EstagioProjeto.EM_APLICACAO && hoje.isAfter(fim)
     }
 
-    // O diário também conta como atualização a partir da feature 5
+    // Atualização = mudança de estágio ou registro no diário, o que for mais recente (spec 005, HU-06).
+    // "Há N dias neste estágio" continua contando só a partir da mudança de estágio
     fun parado(hoje: LocalDate): Boolean {
-        val dias = diasNoEstagio(hoje) ?: return false
-        return projeto.estagio != EstagioProjeto.FINALIZADO && dias > DIAS_PARA_PARADO
+        if (projeto.estagio == EstagioProjeto.FINALIZADO) return false
+        val ultimaAtualizacao = listOfNotNull(
+            dataLocalDoInstante(dataUltimaMudancaEstagio),
+            dataLocalDoInstante(dataUltimoRegistroDiario)
+        ).maxOrNull() ?: return false
+        return ChronoUnit.DAYS.between(ultimaAtualizacao, hoje) > DIAS_PARA_PARADO
     }
 
     // Período de aplicação cruza a semana atual (segunda a domingo)

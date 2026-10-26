@@ -50,14 +50,17 @@ data class ProjetoComRelacoes(
     )
     val historico: List<HistoricoComAutor> = emptyList()
 ) {
-    fun toProjetoResumo(): ProjetoResumo = ProjetoResumo(
+    // O último registro do diário (regra "parado", spec 005) vem de uma consulta à parte, só na lista:
+    // como @Relation, os detalhes também observariam registros_diario e recompunham a cada publicação
+    fun toProjetoResumo(dataUltimoRegistroDiario: String? = null): ProjetoResumo = ProjetoResumo(
         projeto = projeto.toProjeto(),
         // FK RESTRICT garante o orientador; o fallback só evita derrubar a lista se o banco estiver inconsistente
         orientador = orientador?.let { semSenha(it) } ?: Usuario(id = projeto.orientadorId),
         participantes = participantes.map { semSenha(it) }.sortedWith(compareBy(COLLATOR) { it.nome }),
         etapas = etapas.sortedBy { it.ordem }.map { it.toEtapa() },
         // Compara como Instant: o texto ISO muda de tamanho com a fração de segundo e não ordena certo
-        dataUltimaMudancaEstagio = historico.maxByOrNull { lerInstanteIso(it.historico.data) ?: Instant.MIN }?.historico?.data
+        dataUltimaMudancaEstagio = historico.maxByOrNull { lerInstanteIso(it.historico.data) ?: Instant.MIN }?.historico?.data,
+        dataUltimoRegistroDiario = dataUltimoRegistroDiario
     )
 
     // Histórico do mais recente para o mais antigo, ordenado pelo id (autoincremento = ordem de

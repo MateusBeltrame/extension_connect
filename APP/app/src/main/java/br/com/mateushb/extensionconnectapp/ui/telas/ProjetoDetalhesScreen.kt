@@ -13,8 +13,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Lock
@@ -26,6 +29,7 @@ import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -58,13 +62,17 @@ import androidx.compose.ui.unit.sp
 import br.com.mateushb.extensionconnectapp.model.Etapa
 import br.com.mateushb.extensionconnectapp.model.EstagioProjeto
 import br.com.mateushb.extensionconnectapp.model.EventoHistorico
+import br.com.mateushb.extensionconnectapp.model.FiltroDiario
 import br.com.mateushb.extensionconnectapp.model.HistoricoEstagio
 import br.com.mateushb.extensionconnectapp.model.PerfilUsuario
 import br.com.mateushb.extensionconnectapp.model.Projeto
 import br.com.mateushb.extensionconnectapp.model.ProjetoDetalhes
 import br.com.mateushb.extensionconnectapp.model.ProjetoResumo
 import br.com.mateushb.extensionconnectapp.model.RascunhoAplicacao
+import br.com.mateushb.extensionconnectapp.model.RegistroDiario
+import br.com.mateushb.extensionconnectapp.model.RegistroDiarioDetalhes
 import br.com.mateushb.extensionconnectapp.model.TemaProjeto
+import br.com.mateushb.extensionconnectapp.model.TipoRegistro
 import br.com.mateushb.extensionconnectapp.model.TransicaoEstagio
 import br.com.mateushb.extensionconnectapp.model.Usuario
 import br.com.mateushb.extensionconnectapp.model.lerDataIso
@@ -79,17 +87,25 @@ import br.com.mateushb.extensionconnectapp.ui.components.StatusChip
 import br.com.mateushb.extensionconnectapp.ui.components.StatusTone
 import br.com.mateushb.extensionconnectapp.ui.state.AcaoProjetoUiState
 import br.com.mateushb.extensionconnectapp.ui.state.DetalhesProjetoUiState
+import br.com.mateushb.extensionconnectapp.ui.state.ExclusaoRegistroDiarioUiState
+import br.com.mateushb.extensionconnectapp.ui.state.ListaRegistrosDiarioUiState
 import br.com.mateushb.extensionconnectapp.ui.state.MudarEstagioUiState
+import br.com.mateushb.extensionconnectapp.ui.state.SalvarRegistroDiarioUiState
 import br.com.mateushb.extensionconnectapp.ui.theme.ExtensionConnectAPPTheme
 import br.com.mateushb.extensionconnectapp.ui.theme.InfoContainerLight
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 private const val ABA_VISAO_GERAL = 0
+private const val ABA_DIARIO = 1
 
 // Detalhes do projeto (spec 004): card de resumo com as ações de estágio, abas e aba Visão geral.
-// Frames 34:2 (orientador) e 34:220 (finalizado, somente leitura)
+// Frames 34:2 (orientador) e 34:220 (finalizado, somente leitura). Aba Diário na spec 005 (frames 35:2
+// e 35:100): o cabeçalho mostra o título do projeto e o card de resumo sai, como no Figma
 @Composable
 fun ProjetoDetalhesScreen(
     usuario: Usuario,
@@ -102,7 +118,15 @@ fun ProjetoDetalhesScreen(
     onConfirmarCiencia: () -> Unit,
     onAlternarEtapa: (Etapa) -> Unit,
     onMudarEstagioMensagemMostrada: () -> Unit,
-    onAcaoMensagemMostrada: () -> Unit
+    onAcaoMensagemMostrada: () -> Unit,
+    listaRegistrosUiState: ListaRegistrosDiarioUiState,
+    salvarRegistroUiState: SalvarRegistroDiarioUiState,
+    exclusaoRegistroUiState: ExclusaoRegistroDiarioUiState,
+    onPublicarRegistro: (texto: String, etapaId: Int?) -> Unit,
+    onExcluirRegistro: (registroId: Int) -> Unit,
+    onTentarNovamenteDiario: () -> Unit,
+    onSalvarRegistroMensagemMostrada: () -> Unit,
+    onExclusaoRegistroMensagemMostrada: () -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     // O Snackbar roda fora do LaunchedEffect: limpar o estado reinicia o efeito e cancelaria a exibição
@@ -113,6 +137,27 @@ fun ProjetoDetalhesScreen(
     var transicaoAberta by rememberSaveable { mutableStateOf<TransicaoEstagio?>(null) }
     // Erro de gravação fica dentro do sheet: o Snackbar da tela seria desenhado atrás dele
     var erroMudarEstagio by rememberSaveable { mutableStateOf<String?>(null) }
+    // Diário (spec 005): filtro, sheet e diálogo sobrevivem à rotação
+    var filtroDiario by rememberSaveable { mutableStateOf(FiltroDiario.TODOS) }
+    var novoRegistroAberto by rememberSaveable { mutableStateOf(false) }
+    var erroNovoRegistro by rememberSaveable { mutableStateOf<String?>(null) }
+    var registroParaExcluir by rememberSaveable { mutableStateOf<Int?>(null) }
+    val listState = rememberLazyListState()
+
+    val detalhesCarregados = (detalhesUiState as? DetalhesProjetoUiState.Sucesso)?.detalhes
+    val noDiario = abaSelecionada == ABA_DIARIO && detalhesCarregados != null
+    val tipoRegistro = detalhesCarregados?.tipoRegistroPara(usuario)
+    // "Hoje"/"Ontem": recalculados a cada emissão do diário e na virada do dia, com a tela aberta
+    var agora by remember { mutableStateOf(LocalDateTime.now()) }
+    LaunchedEffect(listaRegistrosUiState) { agora = LocalDateTime.now() }
+    LaunchedEffect(Unit) {
+        while (true) {
+            val agoraReal = LocalDateTime.now()
+            val meiaNoite = agoraReal.toLocalDate().plusDays(1).atStartOfDay()
+            delay(Duration.between(agoraReal, meiaNoite).toMillis() + 1_000)
+            agora = LocalDateTime.now()
+        }
+    }
 
     val mostrarMensagem: (String) -> Unit = { mensagem ->
         escopo.launch {
@@ -158,10 +203,68 @@ fun ProjetoDetalhesScreen(
         }
     }
 
+    LaunchedEffect(salvarRegistroUiState) {
+        when (val estado = salvarRegistroUiState) {
+            is SalvarRegistroDiarioUiState.Sucesso -> {
+                novoRegistroAberto = false
+                erroNovoRegistro = null
+                // O novo registro aparece no topo da lista em Todos (HU-03). A rolagem roda à parte: um
+                // toque na lista a cancela, e isso não pode engolir a mensagem nem prender o estado
+                filtroDiario = FiltroDiario.TODOS
+                mostrarMensagem(estado.mensagem)
+                onSalvarRegistroMensagemMostrada()
+                escopo.launch { listState.animateScrollToItem(0) }
+            }
+            is SalvarRegistroDiarioUiState.SemPermissao -> {
+                novoRegistroAberto = false
+                erroNovoRegistro = null
+                mostrarMensagem(estado.mensagem)
+                onSalvarRegistroMensagemMostrada()
+            }
+            // O sheet continua aberto com o que foi digitado e mostra o erro acima dos botões
+            is SalvarRegistroDiarioUiState.Erro -> {
+                erroNovoRegistro = estado.mensagem
+                onSalvarRegistroMensagemMostrada()
+            }
+            else -> Unit
+        }
+    }
+
+    LaunchedEffect(exclusaoRegistroUiState) {
+        when (val estado = exclusaoRegistroUiState) {
+            is ExclusaoRegistroDiarioUiState.Sucesso -> {
+                mostrarMensagem(estado.mensagem)
+                onExclusaoRegistroMensagemMostrada()
+            }
+            is ExclusaoRegistroDiarioUiState.Erro -> {
+                mostrarMensagem(estado.mensagem)
+                onExclusaoRegistroMensagemMostrada()
+            }
+            else -> Unit
+        }
+    }
+
+    // O projeto foi finalizado (ou o usuário saiu dele) com o sheet aberto: fecha e avisa. Durante a
+    // gravação espera o resultado, que já diz se publicou ou não (evita duas mensagens contraditórias)
+    val salvandoRegistro = salvarRegistroUiState is SalvarRegistroDiarioUiState.Salvando
+    LaunchedEffect(detalhesCarregados != null, tipoRegistro, salvandoRegistro) {
+        if (detalhesCarregados != null && tipoRegistro == null && novoRegistroAberto && !salvandoRegistro) {
+            novoRegistroAberto = false
+            erroNovoRegistro = null
+            mostrarMensagem("Você não pode mais publicar neste projeto.")
+        }
+    }
+
     Scaffold(
         topBar = {
             AppTopBar(
-                title = "Projeto",
+                title = if (noDiario) detalhesCarregados.projeto.titulo else "Projeto",
+                subtitle = if (noDiario) {
+                    "Grupo ${detalhesCarregados.projeto.nomeGrupo} · ${detalhesCarregados.projeto.estagio.titulo}"
+                } else {
+                    null
+                },
+                compactTitle = noDiario,
                 navigationIcon = {
                     IconButton(onClick = onVoltarClick) {
                         Icon(imageVector = Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Voltar", tint = Color.White)
@@ -177,6 +280,27 @@ fun ProjetoDetalhesScreen(
                         modifier = Modifier.size(22.dp)
                     )
                 }
+            }
+        },
+        floatingActionButton = {
+            // Só na aba Diário e para quem publica (participante ou orientador, projeto não finalizado)
+            if (noDiario && tipoRegistro != null) {
+                ExtendedFloatingActionButton(
+                    onClick = {
+                        erroNovoRegistro = null
+                        novoRegistroAberto = true
+                    },
+                    icon = { Icon(imageVector = Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(22.dp)) },
+                    text = {
+                        Text(
+                            text = "Novo registro",
+                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        )
+                    },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = RoundedCornerShape(16.dp)
+                )
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -205,17 +329,26 @@ fun ProjetoDetalhesScreen(
                 val detalhes = detalhesUiState.detalhes
                 LazyColumn(
                     modifier = Modifier.fillMaxSize().padding(innerPadding),
-                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 32.dp),
+                    state = listState,
+                    // No Diário, o último card rola até ficar acima do FAB (56dp + margens)
+                    contentPadding = PaddingValues(
+                        start = 20.dp,
+                        end = 20.dp,
+                        top = if (noDiario) 12.dp else 16.dp,
+                        bottom = if (noDiario && tipoRegistro != null) 96.dp else 32.dp
+                    ),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    item(key = "resumo") {
-                        CardResumo(
-                            detalhes = detalhes,
-                            usuario = usuario,
-                            hoje = hoje,
-                            onTransicaoEscolhida = { transicaoAberta = it },
-                            onConfirmarCiencia = onConfirmarCiencia
-                        )
+                    if (abaSelecionada != ABA_DIARIO) {
+                        item(key = "resumo") {
+                            CardResumo(
+                                detalhes = detalhes,
+                                usuario = usuario,
+                                hoje = hoje,
+                                onTransicaoEscolhida = { transicaoAberta = it },
+                                onConfirmarCiencia = onConfirmarCiencia
+                            )
+                        }
                     }
                     item(key = "abas") {
                         SegmentedTabs(
@@ -250,9 +383,47 @@ fun ProjetoDetalhesScreen(
                             )
                         }
                         item(key = "historico") { CardHistorico(historico = detalhes.historico) }
+                    } else if (abaSelecionada == ABA_DIARIO) {
+                        abaDiario(
+                            listaUiState = listaRegistrosUiState,
+                            filtro = filtroDiario,
+                            podePublicar = tipoRegistro != null,
+                            agora = agora,
+                            podeExcluir = { detalhes.podeExcluirRegistro(usuario, it.registro) },
+                            onFiltroChange = { filtroDiario = it },
+                            onExcluirClick = { registroParaExcluir = it.registro.id },
+                            onTentarNovamente = onTentarNovamenteDiario
+                        )
                     } else {
                         item(key = "em-breve") { AbaEmBreve() }
                     }
+                }
+
+                if (novoRegistroAberto && tipoRegistro != null) {
+                    NovoRegistroBottomSheet(
+                        tipo = tipoRegistro,
+                        etapas = detalhes.resumo.etapas,
+                        salvando = salvarRegistroUiState is SalvarRegistroDiarioUiState.Salvando,
+                        erro = erroNovoRegistro,
+                        onPublicar = { texto, etapaId ->
+                            erroNovoRegistro = null
+                            onPublicarRegistro(texto, etapaId)
+                        },
+                        onDispensar = {
+                            novoRegistroAberto = false
+                            erroNovoRegistro = null
+                        }
+                    )
+                }
+
+                registroParaExcluir?.let { registroId ->
+                    ConfirmacaoExclusaoRegistroDialog(
+                        onConfirmar = {
+                            registroParaExcluir = null
+                            onExcluirRegistro(registroId)
+                        },
+                        onDispensar = { registroParaExcluir = null }
+                    )
                 }
 
                 transicaoAberta?.let { transicao ->
@@ -475,7 +646,30 @@ private fun ProjetoDetalhesScreenPreview() {
             onConfirmarCiencia = {},
             onAlternarEtapa = {},
             onMudarEstagioMensagemMostrada = {},
-            onAcaoMensagemMostrada = {}
+            onAcaoMensagemMostrada = {},
+            listaRegistrosUiState = ListaRegistrosDiarioUiState.Sucesso(
+                listOf(
+                    RegistroDiarioDetalhes(
+                        registro = RegistroDiario(
+                            id = 1,
+                            projetoId = 1,
+                            autorId = 1,
+                            data = Instant.now().toString(),
+                            tipo = TipoRegistro.ORIENTACAO,
+                            texto = "Lembrem de registrar fotos autorizadas das oficinas e começar o relatório final até sexta."
+                        ),
+                        autor = ana,
+                        etapa = detalhes.resumo.etapas[1]
+                    )
+                )
+            ),
+            salvarRegistroUiState = SalvarRegistroDiarioUiState.Ocioso,
+            exclusaoRegistroUiState = ExclusaoRegistroDiarioUiState.Ocioso,
+            onPublicarRegistro = { _, _ -> },
+            onExcluirRegistro = {},
+            onTentarNovamenteDiario = {},
+            onSalvarRegistroMensagemMostrada = {},
+            onExclusaoRegistroMensagemMostrada = {}
         )
     }
 }
