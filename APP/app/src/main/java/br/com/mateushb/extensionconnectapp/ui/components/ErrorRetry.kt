@@ -18,12 +18,14 @@ import androidx.compose.ui.unit.dp
  * Erro de carregamento com "Tentar novamente" (Artigo 5.6 da constituição): mensagem em
  * `colorScheme.error` centralizada + botão contornado. Usado na lista de Projetos, no wizard
  * "Novo projeto" e nos detalhes do projeto; passe `Modifier.fillMaxSize()` para centralizar na tela.
+ * [actionLabel] troca o rótulo quando repetir não resolve ("Voltar" no projeto não encontrado).
  */
 @Composable
 fun ErrorRetry(
     message: String,
     onRetry: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    actionLabel: String = "Tentar novamente"
 ) {
     Column(
         modifier = modifier.padding(24.dp),
@@ -38,7 +40,7 @@ fun ErrorRetry(
         )
         Spacer(Modifier.height(16.dp))
         OutlinedButton(onClick = onRetry) {
-            Text("Tentar novamente")
+            Text(actionLabel)
         }
     }
 }

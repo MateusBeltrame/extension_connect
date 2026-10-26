@@ -317,7 +317,7 @@ fun AppNavHost(
             }
 
             composable<AppRoute.ProjetoDetalhes> { entrada ->
-                usuarioDaRota(autenticacaoViewModel.usuarioLogado) { redirecionarSemSessao(entrada) }
+                val usuario = usuarioDaRota(autenticacaoViewModel.usuarioLogado) { redirecionarSemSessao(entrada) }
                     ?: return@composable
                 val projetoId = entrada.toRoute<AppRoute.ProjetoDetalhes>().projetoId
 
@@ -327,10 +327,21 @@ fun AppNavHost(
                     detalhesViewModel.carregarDetalhesProjeto(projetoId)
                 }
 
+                // Permissões de estágio, ciência e etapa são conferidas com o usuário logado (spec 004)
                 ProjetoDetalhesScreen(
+                    usuario = usuario,
                     detalhesUiState = detalhesViewModel.detalhesUiState,
+                    mudarEstagioUiState = detalhesViewModel.mudarEstagioUiState,
+                    acaoUiState = detalhesViewModel.acaoUiState,
                     onVoltarClick = { voltarSeAtiva(navController, entrada) },
-                    onTentarNovamente = { detalhesViewModel.carregarDetalhesProjeto(projetoId) }
+                    onTentarNovamente = { detalhesViewModel.carregarDetalhesProjeto(projetoId) },
+                    onMudarEstagio = { transicao, aplicacao, justificativa ->
+                        detalhesViewModel.mudarEstagio(usuario, transicao, aplicacao, justificativa)
+                    },
+                    onConfirmarCiencia = { detalhesViewModel.confirmarCiencia(usuario) },
+                    onAlternarEtapa = { detalhesViewModel.alternarEtapa(usuario, it) },
+                    onMudarEstagioMensagemMostrada = { detalhesViewModel.limparMudarEstagioUiState() },
+                    onAcaoMensagemMostrada = { detalhesViewModel.limparAcaoUiState() }
                 )
             }
 

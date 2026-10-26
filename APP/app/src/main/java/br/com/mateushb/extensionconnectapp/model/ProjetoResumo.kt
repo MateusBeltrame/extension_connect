@@ -2,9 +2,7 @@ package br.com.mateushb.extensionconnectapp.model
 
 import java.text.Normalizer
 import java.time.DayOfWeek
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 
@@ -29,12 +27,12 @@ data class ProjetoResumo(
         get() = if (etapas.isEmpty()) 0 else etapasConcluidas * 100 / etapas.size
 
     fun diasNoEstagio(hoje: LocalDate): Int? {
-        val desde = dataUltimaMudancaEstagio?.let { paraData(it) } ?: return null
+        val desde = dataLocalDoInstante(dataUltimaMudancaEstagio) ?: return null
         return ChronoUnit.DAYS.between(desde, hoje).toInt().coerceAtLeast(0)
     }
 
     fun atrasado(hoje: LocalDate): Boolean {
-        val fim = projeto.aplicacaoFim?.let { lerData(it) } ?: return false
+        val fim = lerDataIso(projeto.aplicacaoFim) ?: return false
         return projeto.estagio == EstagioProjeto.EM_APLICACAO && hoje.isAfter(fim)
     }
 
@@ -47,8 +45,8 @@ data class ProjetoResumo(
     // Período de aplicação cruza a semana atual (segunda a domingo)
     fun emAplicacaoNaSemana(hoje: LocalDate): Boolean {
         if (projeto.estagio != EstagioProjeto.EM_APLICACAO) return false
-        val inicio = projeto.aplicacaoInicio?.let { lerData(it) } ?: return false
-        val fim = projeto.aplicacaoFim?.let { lerData(it) } ?: return false
+        val inicio = lerDataIso(projeto.aplicacaoInicio) ?: return false
+        val fim = lerDataIso(projeto.aplicacaoFim) ?: return false
         val segunda = hoje.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
         val domingo = segunda.plusDays(6)
         return !inicio.isAfter(domingo) && !fim.isBefore(segunda)
@@ -70,19 +68,5 @@ data class ProjetoResumo(
         // Sem acentos, minúsculo e sem espaços nas pontas: "Raízes" ≈ "raizes"
         fun normalizar(texto: String): String =
             Normalizer.normalize(texto.trim().lowercase(), Normalizer.Form.NFD).replace(ACENTOS, "")
-
-        private fun lerData(iso: String): LocalDate? =
-            try {
-                LocalDate.parse(iso)
-            } catch (_: Exception) {
-                null
-            }
-
-        private fun paraData(instantIso: String): LocalDate? =
-            try {
-                Instant.parse(instantIso).atZone(ZoneId.systemDefault()).toLocalDate()
-            } catch (_: Exception) {
-                null
-            }
     }
 }

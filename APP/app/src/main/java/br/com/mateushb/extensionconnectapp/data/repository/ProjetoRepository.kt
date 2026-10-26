@@ -11,9 +11,13 @@ import br.com.mateushb.extensionconnectapp.model.CandidatoParticipante
 import br.com.mateushb.extensionconnectapp.model.EstagioProjeto
 import br.com.mateushb.extensionconnectapp.model.PerfilUsuario
 import br.com.mateushb.extensionconnectapp.model.Projeto
+import br.com.mateushb.extensionconnectapp.model.ProjetoDetalhes
 import br.com.mateushb.extensionconnectapp.model.ProjetoResumo
+import br.com.mateushb.extensionconnectapp.model.RascunhoAplicacao
 import br.com.mateushb.extensionconnectapp.model.RascunhoProjeto
+import br.com.mateushb.extensionconnectapp.model.ResultadoMudancaEstagio
 import br.com.mateushb.extensionconnectapp.model.ResultadoSalvarProjeto
+import br.com.mateushb.extensionconnectapp.model.TransicaoEstagio
 import br.com.mateushb.extensionconnectapp.model.Usuario
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -39,9 +43,6 @@ class ProjetoRepository(
         }
         return origem.map { lista -> lista.map { it.toProjetoResumo() } }
     }
-
-    fun projetoEmTempoReal(id: Int): Flow<Projeto?> =
-        projetoDao.observarProjetoPorId(id).map { it?.toProjeto() }
 
     // ===== Wizard "Novo projeto" (spec 003) =====
 
@@ -87,6 +88,58 @@ class ProjetoRepository(
                     )
             }
         }
+    }
+
+    // ===== Detalhes e ciclo de estágio (spec 004) =====
+
+    fun projetoDetalhesEmTempoReal(id: Int): Flow<ProjetoDetalhes?> =
+        projetoDao.observarProjetoCompletoPorId(id).map { it?.toProjetoDetalhes() }
+
+    // Quem não é o orientador liga "Aguardando ciência"; o próprio orientador desliga (HU-09).
+    // Aplicação só ao avançar para Em aplicação; justificativa só ao voltar
+    suspend fun mudarEstagio(
+        projeto: Projeto,
+        transicao: TransicaoEstagio,
+        autor: Usuario,
+        aplicacao: RascunhoAplicacao?,
+        justificativa: String?
+    ): ResultadoMudancaEstagio {
+        // A validação do sheet é repetida aqui: Em aplicação sem período, ou volta sem justificativa,
+        // não chegam ao banco por nenhum caminho (revisão da spec 004)
+        if (transicao == TransicaoEstagio.AVANCAR_PARA_APLICACAO) {
+            require(aplicacao != null && aplicacao.erros(projeto).valido) { "Dados de aplicação inválidos" }
+        }
+        if (transicao.voltar) {
+            require(justificativa != null && TransicaoEstagio.erroJustificativa(justificativa) == null) {
+                "Justificativa inválida"
+            }
+        }
+        val dadosAplicacao = aplicacao.takeIf { transicao == TransicaoEstagio.AVANCAR_PARA_APLICACAO }
+        val gravou = projetoDao.mudarEstagio(
+            projetoId = projeto.id,
+            origem = transicao.origem.name,
+            destino = transicao.destino.name,
+            aguardandoCiencia = autor.id != projeto.orientadorId,
+            aplicacaoInicio = dadosAplicacao?.inicio?.toString(),
+            aplicacaoFim = dadosAplicacao?.fim?.toString(),
+            aplicacaoDescricao = dadosAplicacao?.descricao?.trim(),
+            historico = HistoricoEstagioEntity(
+                projetoId = projeto.id,
+                estagio = transicao.destino.name,
+                autorId = autor.id,
+                data = Instant.now().toString(),
+                justificativa = justificativa?.trim().takeIf { transicao.voltar }
+            )
+        )
+        return if (gravou) ResultadoMudancaEstagio.Sucesso else ResultadoMudancaEstagio.EstagioMudou
+    }
+
+    suspend fun confirmarCiencia(projetoId: Int) {
+        projetoDao.confirmarCiencia(projetoId)
+    }
+
+    suspend fun alternarConclusaoEtapa(etapaId: Int) {
+        projetoDao.alternarConclusaoEtapa(etapaId)
     }
 
     // Hash de senha não sai do Repository para telas de outros usuários

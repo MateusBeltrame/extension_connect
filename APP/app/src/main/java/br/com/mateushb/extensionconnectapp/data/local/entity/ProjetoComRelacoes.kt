@@ -3,8 +3,11 @@ package br.com.mateushb.extensionconnectapp.data.local.entity
 import androidx.room.Embedded
 import androidx.room.Junction
 import androidx.room.Relation
+import br.com.mateushb.extensionconnectapp.model.EventoHistorico
+import br.com.mateushb.extensionconnectapp.model.ProjetoDetalhes
 import br.com.mateushb.extensionconnectapp.model.ProjetoResumo
 import br.com.mateushb.extensionconnectapp.model.Usuario
+import br.com.mateushb.extensionconnectapp.model.lerInstanteIso
 import java.text.Collator
 import java.time.Instant
 import java.util.Locale
@@ -38,11 +41,14 @@ data class ProjetoComRelacoes(
     )
     val etapas: List<EtapaEntity> = emptyList(),
 
+    // Com o autor de cada linha: os detalhes leem tudo numa única consulta, sem combinar dois Flows
+    // que podem emitir fora de sincronia depois de uma mudança de estágio (revisão da spec 004)
     @Relation(
         parentColumn = "id",
+        entity = HistoricoEstagioEntity::class,
         entityColumn = "projeto_id"
     )
-    val historico: List<HistoricoEstagioEntity> = emptyList()
+    val historico: List<HistoricoComAutor> = emptyList()
 ) {
     fun toProjetoResumo(): ProjetoResumo = ProjetoResumo(
         projeto = projeto.toProjeto(),
@@ -51,8 +57,23 @@ data class ProjetoComRelacoes(
         participantes = participantes.map { semSenha(it) }.sortedWith(compareBy(COLLATOR) { it.nome }),
         etapas = etapas.sortedBy { it.ordem }.map { it.toEtapa() },
         // Compara como Instant: o texto ISO muda de tamanho com a fração de segundo e não ordena certo
-        dataUltimaMudancaEstagio = historico.maxByOrNull { instanteOuMinimo(it.data) }?.data
+        dataUltimaMudancaEstagio = historico.maxByOrNull { lerInstanteIso(it.historico.data) ?: Instant.MIN }?.historico?.data
     )
+
+    // Histórico do mais recente para o mais antigo, ordenado pelo id (autoincremento = ordem de
+    // gravação, imune a relógio do aparelho ajustado para trás). O estágio anterior de cada linha é o
+    // da linha gravada logo antes; a mais antiga é a criação do projeto
+    fun toProjetoDetalhes(): ProjetoDetalhes {
+        val cronologico = historico.sortedBy { it.historico.id }
+        val eventos = cronologico.mapIndexed { indice, linha ->
+            EventoHistorico(
+                historico = linha.historico.toHistoricoEstagio(),
+                autor = linha.autor?.let { semSenha(it) },
+                estagioAnterior = cronologico.getOrNull(indice - 1)?.historico?.toHistoricoEstagio()?.estagio
+            )
+        }
+        return ProjetoDetalhes(resumo = toProjetoResumo(), historico = eventos.reversed())
+    }
 
     companion object {
         private val COLLATOR: Collator = Collator.getInstance(Locale.forLanguageTag("pt-BR"))
@@ -60,11 +81,5 @@ data class ProjetoComRelacoes(
         // O hash de senha não sai da camada de dados: o estado de tela pode acabar em log/relatório de crash
         private fun semSenha(entity: UsuarioEntity): Usuario = entity.toUsuario().copy(senhaHash = "")
 
-        private fun instanteOuMinimo(iso: String): Instant =
-            try {
-                Instant.parse(iso)
-            } catch (_: Exception) {
-                Instant.MIN
-            }
     }
 }
