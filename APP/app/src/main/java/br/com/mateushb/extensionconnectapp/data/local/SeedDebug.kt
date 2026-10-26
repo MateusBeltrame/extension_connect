@@ -218,6 +218,93 @@ object SeedDebug {
         db.insert("registros_diario", SQLiteDatabase.CONFLICT_ABORT, registro)
     }
 
+    // Spec 006: fotos e documentos do frame 35:231 no Grupo Raízes, e dois envios na fila de
+    // aluno@afya.br. Sem arquivo no aparelho (caminho vazio): as fotos mostram o gradiente do Figma e
+    // "Abrir" avisa que o arquivo não existe. Pode rodar num banco que já tem os projetos (migração 4 → 5)
+    fun inserirArquivosExemplo(db: SupportSQLiteDatabase) {
+        // Idempotente: onCreate e migração não duplicam
+        val jaTemArquivos = db.query("SELECT 1 FROM fotos UNION ALL SELECT 1 FROM arquivos LIMIT 1")
+            .use { it.moveToFirst() }
+        if (jaTemArquivos) return
+
+        val projetoId = db.query("SELECT id FROM projetos WHERE nome_grupo = ?", arrayOf("Raízes"))
+            .use { if (it.moveToFirst()) it.getLong(0) else null } ?: return
+        val agora = LocalDateTime.now()
+
+        // Da mais recente para a mais antiga, como no grid: 1ª, 3ª e 5ª autorizadas no Mural
+        val autoresFotos = listOf(
+            "aluno@afya.br", "julia.lima@afya.br", "aluno@afya.br",
+            "carla.rocha@afya.br", "julia.lima@afya.br", "aluno@afya.br"
+        )
+        autoresFotos.forEachIndexed { indice, autor ->
+            val autorId = idOuNull(db, autor) ?: return@forEachIndexed
+            val foto = ContentValues().apply {
+                put("projeto_id", projetoId)
+                put("autor_id", autorId)
+                put("nome_arquivo", "IMG_20${25 + indice}.jpg")
+                put("tamanho_bytes", 1_200_000L + indice * 90_000L)
+                put("caminho_local", "")
+                put("data_envio", instanteSeed(agora.minusDays(1L + indice * 3)))
+                put("autorizada_mural", if (indice % 2 == 0) 1 else 0)
+                put("status_envio", "ENVIADO")
+            }
+            db.insert("fotos", SQLiteDatabase.CONFLICT_ABORT, foto)
+        }
+
+        inserirArquivoSeed(db, projetoId, "aluno@afya.br", "Relatorio_parcial.pdf", "PDF", 1_258_291L, agora.minusDays(2), "ENVIADO")
+        inserirArquivoSeed(db, projetoId, "julia.lima@afya.br", "Plano_das_oficinas.docx", "DOCX", 348_160L, agora.minusDays(8), "ENVIADO")
+        inserirArquivoSeed(db, projetoId, "carla.rocha@afya.br", "Lista_de_presenca.xlsx", "XLSX", 87_040L, agora.minusDays(15), "ENVIADO")
+
+        // Fila de aluno@afya.br: a FilaEnvio conclui os dois em segundos se houver internet
+        idOuNull(db, "aluno@afya.br")?.let { autorId ->
+            val pendente = ContentValues().apply {
+                put("projeto_id", projetoId)
+                put("autor_id", autorId)
+                put("nome_arquivo", "IMG_2031.jpg")
+                put("tamanho_bytes", 1_468_006L)
+                put("caminho_local", "")
+                put("data_envio", instanteSeed(agora.minusMinutes(10)))
+                put("autorizada_mural", 0)
+                // O banco só guarda pendente ou enviado; o progresso é da FilaEnvio, em memória
+                put("status_envio", "AGUARDANDO_ENVIO")
+            }
+            db.insert("fotos", SQLiteDatabase.CONFLICT_ABORT, pendente)
+        }
+        inserirArquivoSeed(db, projetoId, "aluno@afya.br", "Fotos_oficina2.pdf", "PDF", 2_411_724L, agora.minusMinutes(5), "AGUARDANDO_ENVIO")
+    }
+
+    private fun inserirArquivoSeed(
+        db: SupportSQLiteDatabase,
+        projetoId: Long,
+        autor: String,
+        nome: String,
+        extensao: String,
+        tamanhoBytes: Long,
+        momento: LocalDateTime,
+        status: String
+    ) {
+        val autorId = idOuNull(db, autor) ?: return
+        val arquivo = ContentValues().apply {
+            put("projeto_id", projetoId)
+            put("autor_id", autorId)
+            put("nome_arquivo", nome)
+            put("extensao", extensao)
+            put("tamanho_bytes", tamanhoBytes)
+            put("caminho_local", "")
+            put("data_envio", instanteSeed(momento))
+            put("status_envio", status)
+        }
+        db.insert("arquivos", SQLiteDatabase.CONFLICT_ABORT, arquivo)
+    }
+
+    // Como no seed do diário: conta ausente pula o item em vez de abortar a migração
+    private fun idOuNull(db: SupportSQLiteDatabase, email: String): Long? =
+        db.query("SELECT id FROM usuarios WHERE email = ?", arrayOf(email))
+            .use { if (it.moveToFirst()) it.getLong(0) else null }
+
+    private fun instanteSeed(momento: LocalDateTime): String =
+        momento.atZone(ZoneId.systemDefault()).toInstant().toString()
+
     private val ALUNOS_NOVO_PROJETO = listOf(
         "Lucas Moura" to "lucas.moura@afya.br",
         "Lúcio Carvalho" to "lucio.carvalho@afya.br",

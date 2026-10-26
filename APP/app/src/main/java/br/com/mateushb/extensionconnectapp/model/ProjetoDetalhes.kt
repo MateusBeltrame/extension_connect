@@ -58,4 +58,13 @@ data class ProjetoDetalhes(
 
     fun podeExcluirRegistro(usuario: Usuario, registro: RegistroDiario): Boolean =
         !somenteLeitura && registro.autorId == usuario.id && registro.projetoId == projeto.id
+
+    // ===== Arquivos e fotos (spec 006) =====
+
+    // Participante e orientador enviam; Administrador e professor que não orienta só veem
+    fun podeEnviarArquivos(usuario: Usuario): Boolean =
+        !somenteLeitura && (ehOrientador(usuario) || ehParticipante(usuario))
+
+    // Excluir e mudar a autorização do Mural: só o autor, com projeto não finalizado
+    fun podeGerenciarArquivo(usuario: Usuario, autorId: Int): Boolean = !somenteLeitura && autorId == usuario.id
 }

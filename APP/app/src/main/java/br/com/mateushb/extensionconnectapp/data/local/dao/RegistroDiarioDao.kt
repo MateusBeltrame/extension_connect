@@ -21,11 +21,9 @@ interface RegistroDiarioDao {
     // Conta ativa, projeto não finalizado e o papel bate com o tipo: orientador registra Orientação,
     // participante registra Atividade. Desativar a conta tira o direito mesmo com a sessão aberta
     @Query(
-        "SELECT COUNT(*) FROM projetos p WHERE p.id = :projetoId AND p.estagio != 'FINALIZADO' " +
-            "AND EXISTS (SELECT 1 FROM usuarios u WHERE u.id = :autorId AND u.ativo = 1) AND (" +
+        "SELECT COUNT(*) FROM projetos p WHERE ${RegrasPermissao.PROJETO_ABERTO_E_AUTOR_ATIVO} AND (" +
             "(:tipo = 'ORIENTACAO' AND p.orientador_id = :autorId) OR " +
-            "(:tipo = 'ATIVIDADE' AND EXISTS (SELECT 1 FROM projeto_participantes pp " +
-            "WHERE pp.projeto_id = p.id AND pp.aluno_id = :autorId)))"
+            "(:tipo = 'ATIVIDADE' AND ${RegrasPermissao.E_PARTICIPANTE}))"
     )
     suspend fun contarPodePublicar(projetoId: Int, autorId: Int, tipo: String): Int
 
@@ -48,8 +46,7 @@ interface RegistroDiarioDao {
     // Só o próprio registro, de conta ativa e em projeto não finalizado; retorna quantas linhas apagou (0 ou 1)
     @Query(
         "DELETE FROM registros_diario WHERE id = :id AND autor_id = :autorId " +
-            "AND projeto_id IN (SELECT id FROM projetos WHERE estagio != 'FINALIZADO') " +
-            "AND EXISTS (SELECT 1 FROM usuarios u WHERE u.id = :autorId AND u.ativo = 1)"
+            "AND ${RegrasPermissao.PROJETO_NAO_FINALIZADO} AND ${RegrasPermissao.AUTOR_ATIVO}"
     )
     suspend fun excluirDoAutor(id: Int, autorId: Int): Int
 }

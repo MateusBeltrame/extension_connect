@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Sell
 import androidx.compose.material3.Icon
@@ -314,47 +313,10 @@ private fun LinhaHistorico(evento: EventoHistorico, maisRecente: Boolean) {
 
 // ===== Aba Arquivos (feature 6) =====
 
-@Composable
-internal fun AbaEmBreve() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(64.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.HourglassEmpty,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp)
-            )
-        }
-        Text(
-            text = "Em breve",
-            style = MaterialTheme.typography.titleLarge.copy(fontSize = 16.sp),
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = "Esta aba chega numa próxima versão.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-    }
-}
-
 // ===== Apoio =====
 
 @Composable
-private fun TituloCard(texto: String, modifier: Modifier = Modifier) {
+internal fun TituloCard(texto: String, modifier: Modifier = Modifier) {
     Text(
         text = texto,
         style = MaterialTheme.typography.titleLarge.copy(fontSize = 15.sp),

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pastas expostas pelo FileProvider (spec 006): documentos e fotos guardados, e capturas da câmera -->
+<paths>
+    <files-path name="arquivos" path="arquivos/" />
+    <files-path name="fotos" path="fotos/" />
+    <cache-path name="camera" path="camera/" />
+</paths>
