@@ -15,6 +15,13 @@ data class Usuario(
     val primeiroNome: String
         get() = nome.trim().substringBefore(' ')
 
+    // Primeiro e último nome (cabeçalho de "Meu perfil", spec 008); um nome só fica como está
+    val nomeCurto: String
+        get() {
+            val partes = nome.trim().split(ESPACOS)
+            return if (partes.size <= 1) nome.trim() else "${partes.first()} ${partes.last()}"
+        }
+
     // Aluno sem RA/curso precisa passar pela tela "Completar cadastro"
     val cadastroIncompleto: Boolean
         get() = perfil == PerfilUsuario.ALUNO && (ra.isNullOrBlank() || curso == null)
@@ -28,6 +35,8 @@ data class Usuario(
     fun correspondeABusca(termo: String): Boolean = chaveBusca.contains(termo)
 
     companion object {
+        private val ESPACOS = "\\s+".toRegex()
+
         // E-mail é comparado e gravado sem espaços nas pontas e em minúsculas
         fun normalizarEmail(email: String): String = email.trim().lowercase()
     }

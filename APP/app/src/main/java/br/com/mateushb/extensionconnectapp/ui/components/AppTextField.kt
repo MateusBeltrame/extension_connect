@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,6 +28,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -50,6 +54,9 @@ import br.com.mateushb.extensionconnectapp.ui.theme.WarningAmber
  * [locked] (spec 007): campo que a regra não deixa editar — o texto também fica cinza (e-mail e perfil
  * do próprio cadastro em "Editar pessoa", frames 36:175 e 36:420). Só `enabled = false` (ex.: enquanto
  * salva) mantém o texto escuro, para não parecer que o valor sumiu.
+ *
+ * [supportingIcon] (spec 008): ícone de 14dp antes do [supportingText], a 6dp dele, com o texto em
+ * Medium ("⚠ Senha atual incorreta", frame 36:754).
  */
 @Composable
 fun AppTextField(
@@ -70,7 +77,8 @@ fun AppTextField(
     height: Dp = 44.dp,
     counter: String? = null,
     isWarning: Boolean = false,
-    locked: Boolean = false
+    locked: Boolean = false,
+    supportingIcon: ImageVector? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val focado by interactionSource.collectIsFocusedAsState()
@@ -133,11 +141,27 @@ fun AppTextField(
         )
         if (supportingText != null || counter != null) {
             Spacer(Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(if (supportingIcon != null) 6.dp else 8.dp)) {
+                val corApoio = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
+                if (supportingIcon != null && supportingText != null) {
+                    Icon(
+                        imageVector = supportingIcon,
+                        contentDescription = null,
+                        tint = corApoio,
+                        modifier = Modifier.padding(top = 1.dp).size(14.dp)
+                    )
+                }
                 Text(
                     text = supportingText.orEmpty(),
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                    color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 12.sp,
+                        fontWeight = if (supportingIcon != null) {
+                            FontWeight.Medium
+                        } else {
+                            MaterialTheme.typography.bodySmall.fontWeight
+                        }
+                    ),
+                    color = corApoio,
                     modifier = Modifier.weight(1f)
                 )
                 if (counter != null) {

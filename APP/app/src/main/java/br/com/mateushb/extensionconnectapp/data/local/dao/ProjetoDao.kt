@@ -30,6 +30,16 @@ interface ProjetoDao {
     )
     fun observarProjetosCompletosDoAluno(alunoId: Int): Flow<List<ProjetoComRelacoes>>
 
+    // Meu perfil (spec 008): só a linha do projeto, sem relações nem diário
+    @Query(
+        "SELECT * FROM projetos WHERE estagio != 'FINALIZADO' AND id IN " +
+            "(SELECT projeto_id FROM projeto_participantes WHERE aluno_id = :alunoId)"
+    )
+    fun observarProjetosAtivosDoAluno(alunoId: Int): Flow<List<ProjetoEntity>>
+
+    @Query("SELECT * FROM projetos WHERE orientador_id = :orientadorId AND estagio != 'FINALIZADO'")
+    fun observarProjetosOrientadosAtivos(orientadorId: Int): Flow<List<ProjetoEntity>>
+
     @Transaction
     @Query("SELECT * FROM projetos WHERE id = :id")
     fun observarProjetoCompletoPorId(id: Int): Flow<ProjetoComRelacoes?>

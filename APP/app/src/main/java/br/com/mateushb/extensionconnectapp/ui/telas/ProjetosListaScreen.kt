@@ -549,9 +549,12 @@ private fun textoDiasNoEstagio(dias: Int?): String? = when (dias) {
     else -> "Há $dias dias neste estágio"
 }
 
-// "Mateus Silva" → "MS"; nome de uma palavra → primeira letra
+private val ESPACOS = "\\s+".toRegex()
+
+// "Mateus Silva" → "MS"; nome de uma palavra → primeira letra. Mesmo critério de Usuario.nomeCurto
+// (primeiro e último nome, separados por qualquer espaço)
 internal fun iniciais(nome: String): String {
-    val partes = nome.trim().split(" ").filter { it.isNotBlank() }
+    val partes = nome.trim().split(ESPACOS).filter { it.isNotBlank() }
     return when {
         partes.isEmpty() -> "?"
         partes.size == 1 -> partes.first().take(1).uppercase()

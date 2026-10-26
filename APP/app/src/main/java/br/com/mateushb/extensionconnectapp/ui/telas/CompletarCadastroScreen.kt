@@ -111,7 +111,7 @@ private fun FormularioCompletarCadastro(
                 AppTextField(
                     value = ra,
                     // RA aceita apenas dígitos
-                    onValueChange = { novo -> ra = novo.filter(Char::isDigit); raErro = null },
+                    onValueChange = { novo -> ra = novo.filter { it in '0'..'9' }; raErro = null },
                     placeholder = "Ex.: 2023104587",
                     label = "RA / Matrícula",
                     leadingIcon = { IconeCampo(Icons.Outlined.Tag) },
@@ -153,7 +153,7 @@ private fun FormularioCompletarCadastro(
                 text = "Salvar e continuar",
                 loading = salvando,
                 onClick = {
-                    raErro = if (ra.isBlank()) "Informe o RA" else null
+                    raErro = ValidacaoAcesso.erroRa(ra, obrigatorio = true)
                     cursoErro = if (curso == null) "Selecione o curso" else null
                     val cursoEscolhido = curso
                     if (raErro == null && cursoEscolhido != null) onSalvarClick(ra, cursoEscolhido)

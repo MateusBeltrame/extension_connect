@@ -110,6 +110,14 @@ class AutenticacaoViewModel @JvmOverloads constructor(
         }
     }
 
+    // Meu perfil (spec 008): aplica na hora o que acabou de ser salvo, sem esperar a próxima emissão do
+    // Room (senão o nome antigo aparece por alguns frames). O hash de senha não vem da tela: fica o da sessão
+    fun atualizarUsuarioLogado(usuario: Usuario) {
+        val atual = usuarioLogado ?: return
+        if (atual.id != usuario.id) return
+        sessaoUiState = SessaoUiState.Autenticado(usuario.copy(senhaHash = atual.senhaHash))
+    }
+
     fun sair() {
         observacaoSessaoJob?.cancel()
         observacaoSessaoJob = null

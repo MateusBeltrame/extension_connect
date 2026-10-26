@@ -1,6 +1,5 @@
 package br.com.mateushb.extensionconnectapp.ui.telas
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,14 +9,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,13 +27,9 @@ import androidx.compose.ui.unit.sp
 import br.com.mateushb.extensionconnectapp.ui.components.AppTopBar
 import br.com.mateushb.extensionconnectapp.ui.theme.ExtensionConnectAPPTheme
 
-// Tela PROVISÓRIA para os itens da BottomBar que ainda não têm feature (Mural, Pessoas, Meu perfil).
-// Com onSairClick mostra "Sair da conta" (usado em Meu perfil até a feature 8)
+// Tela PROVISÓRIA para os itens da BottomBar que ainda não têm feature (hoje só o Mural, até a feature 9)
 @Composable
-fun EmBreveScreen(
-    titulo: String,
-    onSairClick: (() -> Unit)? = null
-) {
+fun EmBreveScreen(titulo: String) {
     Scaffold(
         topBar = { AppTopBar(title = titulo) },
         containerColor = MaterialTheme.colorScheme.background
@@ -77,22 +69,6 @@ fun EmBreveScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
-            if (onSairClick != null) {
-                Spacer(Modifier.height(24.dp))
-                OutlinedButton(
-                    onClick = onSairClick,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.Logout,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Sair da conta", color = MaterialTheme.colorScheme.primary)
-                }
-            }
         }
     }
 }
@@ -101,6 +77,6 @@ fun EmBreveScreen(
 @Composable
 private fun EmBreveScreenPreview() {
     ExtensionConnectAPPTheme(darkTheme = false) {
-        EmBreveScreen(titulo = "Meu perfil", onSairClick = {})
+        EmBreveScreen(titulo = "Mural")
     }
 }
