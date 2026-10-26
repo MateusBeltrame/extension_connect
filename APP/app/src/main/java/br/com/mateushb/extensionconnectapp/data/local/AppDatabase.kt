@@ -7,10 +7,14 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import br.com.mateushb.extensionconnectapp.BuildConfig
+import br.com.mateushb.extensionconnectapp.data.local.dao.ArquivoDao
+import br.com.mateushb.extensionconnectapp.data.local.dao.FotoDao
 import br.com.mateushb.extensionconnectapp.data.local.dao.ProjetoDao
 import br.com.mateushb.extensionconnectapp.data.local.dao.RegistroDiarioDao
 import br.com.mateushb.extensionconnectapp.data.local.dao.UsuarioDao
+import br.com.mateushb.extensionconnectapp.data.local.entity.ArquivoEntity
 import br.com.mateushb.extensionconnectapp.data.local.entity.EtapaEntity
+import br.com.mateushb.extensionconnectapp.data.local.entity.FotoEntity
 import br.com.mateushb.extensionconnectapp.data.local.entity.HistoricoEstagioEntity
 import br.com.mateushb.extensionconnectapp.data.local.entity.ProjetoEntity
 import br.com.mateushb.extensionconnectapp.data.local.entity.ProjetoParticipanteEntity
@@ -24,9 +28,11 @@ import br.com.mateushb.extensionconnectapp.data.local.entity.UsuarioEntity
         EtapaEntity::class,
         ProjetoParticipanteEntity::class,
         HistoricoEstagioEntity::class,
-        RegistroDiarioEntity::class
+        RegistroDiarioEntity::class,
+        ArquivoEntity::class,
+        FotoEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -36,6 +42,10 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun projetoDao(): ProjetoDao
 
     abstract fun registroDiarioDao(): RegistroDiarioDao
+
+    abstract fun arquivoDao(): ArquivoDao
+
+    abstract fun fotoDao(): FotoDao
 
     companion object {
         @Volatile
@@ -51,6 +61,7 @@ abstract class AppDatabase : RoomDatabase() {
                 SeedDebug.inserirProjetosExemplo(db, senhaHash)
                 SeedDebug.inserirAlunosNovoProjeto(db, senhaHash)
                 SeedDebug.inserirRegistrosDiario(db)
+                SeedDebug.inserirArquivosExemplo(db)
             }
         }
 
@@ -172,6 +183,63 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Spec 006: arquivos e fotos do projeto. SQL idêntico ao gerado pela ArquivoEntity/FotoEntity
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `arquivos` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `projeto_id` INTEGER NOT NULL,
+                        `autor_id` INTEGER NOT NULL,
+                        `nome_arquivo` TEXT NOT NULL,
+                        `extensao` TEXT NOT NULL,
+                        `tamanho_bytes` INTEGER NOT NULL,
+                        `caminho_local` TEXT NOT NULL,
+                        `data_envio` TEXT NOT NULL,
+                        `status_envio` TEXT NOT NULL,
+                        `progresso` INTEGER,
+                        FOREIGN KEY(`projeto_id`) REFERENCES `projetos`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`autor_id`) REFERENCES `usuarios`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_arquivos_projeto_id` ON `arquivos` (`projeto_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_arquivos_autor_id` ON `arquivos` (`autor_id`)")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `fotos` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `projeto_id` INTEGER NOT NULL,
+                        `autor_id` INTEGER NOT NULL,
+                        `nome_arquivo` TEXT NOT NULL,
+                        `tamanho_bytes` INTEGER NOT NULL,
+                        `caminho_local` TEXT NOT NULL,
+                        `data_envio` TEXT NOT NULL,
+                        `legenda` TEXT,
+                        `autorizada_mural` INTEGER NOT NULL,
+                        `status_envio` TEXT NOT NULL,
+                        `progresso` INTEGER,
+                        FOREIGN KEY(`projeto_id`) REFERENCES `projetos`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`autor_id`) REFERENCES `usuarios`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_fotos_projeto_id` ON `fotos` (`projeto_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_fotos_autor_id` ON `fotos` (`autor_id`)")
+
+                // Banco debug já existente também recebe os arquivos de exemplo
+                if (BuildConfig.DEBUG) {
+                    try {
+                        SeedDebug.inserirArquivosExemplo(db)
+                    } catch (_: Exception) {
+                        // Dados de teste nunca derrubam a migração de schema: a aba só fica sem exemplos
+                    }
+                }
+            }
+        }
+
         fun obterInstancia(context: Context): AppDatabase {
             // Confere de novo dentro do lock: duas threads podem ter visto INSTANCE nulo
             return INSTANCE ?: synchronized(this) {
@@ -188,7 +256,7 @@ abstract class AppDatabase : RoomDatabase() {
                 AppDatabase::class.java,
                 "extension_connect_database.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             if (BuildConfig.DEBUG) builder.addCallback(SEED_CALLBACK)
             return builder.build()
         }

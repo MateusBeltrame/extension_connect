@@ -326,6 +326,7 @@ fun AppNavHost(
                 LaunchedEffect(projetoId) {
                     detalhesViewModel.carregarDetalhesProjeto(projetoId)
                     detalhesViewModel.carregarDiario(projetoId)
+                    detalhesViewModel.carregarArquivos(projetoId)
                 }
 
                 // Permissões de estágio, ciência e etapa são conferidas com o usuário logado (spec 004)
@@ -351,7 +352,29 @@ fun AppNavHost(
                     onExcluirRegistro = { detalhesViewModel.excluirRegistro(usuario, it) },
                     onTentarNovamenteDiario = { detalhesViewModel.carregarDiario(projetoId) },
                     onSalvarRegistroMensagemMostrada = { detalhesViewModel.limparSalvarRegistroUiState() },
-                    onExclusaoRegistroMensagemMostrada = { detalhesViewModel.limparExclusaoRegistroUiState() }
+                    onExclusaoRegistroMensagemMostrada = { detalhesViewModel.limparExclusaoRegistroUiState() },
+                    // Arquivos (spec 006): quem envia, exclui e muda a autorização é conferido com o usuário logado
+                    listaArquivosUiState = detalhesViewModel.listaArquivosUiState,
+                    preparacaoFotoUiState = detalhesViewModel.preparacaoFotoUiState,
+                    envioDocumentoUiState = detalhesViewModel.envioDocumentoUiState,
+                    envioFotoUiState = detalhesViewModel.envioFotoUiState,
+                    exclusaoArquivoUiState = detalhesViewModel.exclusaoArquivoUiState,
+                    onEnviarDocumento = { detalhesViewModel.enviarDocumento(usuario, it) },
+                    onPrepararFoto = { uri, daCamera -> detalhesViewModel.prepararFoto(usuario, uri, daCamera) },
+                    onEnviarFoto = { detalhesViewModel.enviarFoto(usuario, it) },
+                    onDescartarFoto = { detalhesViewModel.descartarFoto() },
+                    onAlterarAutorizacaoMural = { fotoId, autorizada ->
+                        detalhesViewModel.alterarAutorizacaoMural(usuario, fotoId, autorizada)
+                    },
+                    onExcluirDocumento = { detalhesViewModel.excluirDocumento(usuario, it) },
+                    onExcluirFoto = { detalhesViewModel.excluirFoto(usuario, it) },
+                    novaUriCaptura = { detalhesViewModel.novaUriCaptura() },
+                    uriDoDocumento = { detalhesViewModel.uriDoDocumento(it) },
+                    onTentarNovamenteArquivos = { detalhesViewModel.carregarArquivos(projetoId) },
+                    onPreparacaoFotoErroMostrado = { detalhesViewModel.limparErroPreparacaoFoto() },
+                    onEnvioDocumentoMensagemMostrada = { detalhesViewModel.limparEnvioDocumentoUiState() },
+                    onEnvioFotoMensagemMostrada = { detalhesViewModel.limparEnvioFotoUiState() },
+                    onExclusaoArquivoMensagemMostrada = { detalhesViewModel.limparExclusaoArquivoUiState() }
                 )
             }
 

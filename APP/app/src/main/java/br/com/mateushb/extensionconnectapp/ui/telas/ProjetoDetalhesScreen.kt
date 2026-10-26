@@ -1,5 +1,11 @@
 package br.com.mateushb.extensionconnectapp.ui.telas
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MoreVert
@@ -52,6 +59,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -59,10 +67,12 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import br.com.mateushb.extensionconnectapp.model.Arquivo
 import br.com.mateushb.extensionconnectapp.model.Etapa
 import br.com.mateushb.extensionconnectapp.model.EstagioProjeto
 import br.com.mateushb.extensionconnectapp.model.EventoHistorico
 import br.com.mateushb.extensionconnectapp.model.FiltroDiario
+import br.com.mateushb.extensionconnectapp.model.FormatoDocumento
 import br.com.mateushb.extensionconnectapp.model.HistoricoEstagio
 import br.com.mateushb.extensionconnectapp.model.PerfilUsuario
 import br.com.mateushb.extensionconnectapp.model.Projeto
@@ -87,9 +97,13 @@ import br.com.mateushb.extensionconnectapp.ui.components.StatusChip
 import br.com.mateushb.extensionconnectapp.ui.components.StatusTone
 import br.com.mateushb.extensionconnectapp.ui.state.AcaoProjetoUiState
 import br.com.mateushb.extensionconnectapp.ui.state.DetalhesProjetoUiState
+import br.com.mateushb.extensionconnectapp.ui.state.EnvioArquivoUiState
+import br.com.mateushb.extensionconnectapp.ui.state.ExclusaoArquivoUiState
 import br.com.mateushb.extensionconnectapp.ui.state.ExclusaoRegistroDiarioUiState
+import br.com.mateushb.extensionconnectapp.ui.state.ListaArquivosUiState
 import br.com.mateushb.extensionconnectapp.ui.state.ListaRegistrosDiarioUiState
 import br.com.mateushb.extensionconnectapp.ui.state.MudarEstagioUiState
+import br.com.mateushb.extensionconnectapp.ui.state.PreparacaoFotoUiState
 import br.com.mateushb.extensionconnectapp.ui.state.SalvarRegistroDiarioUiState
 import br.com.mateushb.extensionconnectapp.ui.theme.ExtensionConnectAPPTheme
 import br.com.mateushb.extensionconnectapp.ui.theme.InfoContainerLight
@@ -102,10 +116,12 @@ import java.time.LocalDateTime
 
 private const val ABA_VISAO_GERAL = 0
 private const val ABA_DIARIO = 1
+private const val ABA_ARQUIVOS = 2
 
 // Detalhes do projeto (spec 004): card de resumo com as ações de estágio, abas e aba Visão geral.
 // Frames 34:2 (orientador) e 34:220 (finalizado, somente leitura). Aba Diário na spec 005 (frames 35:2
-// e 35:100): o cabeçalho mostra o título do projeto e o card de resumo sai, como no Figma
+// e 35:100): o cabeçalho mostra o título do projeto e o card de resumo sai, como no Figma. Aba Arquivos
+// na spec 006 (frames 35:231, 35:408 e 35:630), com o mesmo cabeçalho do Diário
 @Composable
 fun ProjetoDetalhesScreen(
     usuario: Usuario,
@@ -126,7 +142,27 @@ fun ProjetoDetalhesScreen(
     onExcluirRegistro: (registroId: Int) -> Unit,
     onTentarNovamenteDiario: () -> Unit,
     onSalvarRegistroMensagemMostrada: () -> Unit,
-    onExclusaoRegistroMensagemMostrada: () -> Unit
+    onExclusaoRegistroMensagemMostrada: () -> Unit,
+    listaArquivosUiState: ListaArquivosUiState,
+    preparacaoFotoUiState: PreparacaoFotoUiState,
+    envioDocumentoUiState: EnvioArquivoUiState,
+    envioFotoUiState: EnvioArquivoUiState,
+    exclusaoArquivoUiState: ExclusaoArquivoUiState,
+    onEnviarDocumento: (Uri) -> Unit,
+    onPrepararFoto: (uri: Uri, daCamera: Boolean) -> Unit,
+    onEnviarFoto: (autorizada: Boolean) -> Unit,
+    onDescartarFoto: () -> Unit,
+    onAlterarAutorizacaoMural: (fotoId: Int, autorizada: Boolean) -> Unit,
+    onExcluirDocumento: (arquivoId: Int) -> Unit,
+    onExcluirFoto: (fotoId: Int) -> Unit,
+    // Os seletores do sistema ficam na tela; as Uris vêm do ViewModel (exceção do plan, Artigo 5.3)
+    novaUriCaptura: () -> Uri?,
+    uriDoDocumento: (Arquivo) -> Uri?,
+    onTentarNovamenteArquivos: () -> Unit,
+    onPreparacaoFotoErroMostrado: () -> Unit,
+    onEnvioDocumentoMensagemMostrada: () -> Unit,
+    onEnvioFotoMensagemMostrada: () -> Unit,
+    onExclusaoArquivoMensagemMostrada: () -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     // O Snackbar roda fora do LaunchedEffect: limpar o estado reinicia o efeito e cancelaria a exibição
@@ -142,11 +178,23 @@ fun ProjetoDetalhesScreen(
     var novoRegistroAberto by rememberSaveable { mutableStateOf(false) }
     var erroNovoRegistro by rememberSaveable { mutableStateOf<String?>(null) }
     var registroParaExcluir by rememberSaveable { mutableStateOf<Int?>(null) }
+    // Arquivos (spec 006): sheets, diálogo e a Uri da câmera sobrevivem à rotação
+    var enviarArquivoAberto by rememberSaveable { mutableStateOf(false) }
+    var uriCaptura by rememberSaveable { mutableStateOf<String?>(null) }
+    var fotoAbertaId by rememberSaveable { mutableStateOf<Int?>(null) }
+    var documentoParaExcluir by rememberSaveable { mutableStateOf<Int?>(null) }
+    var erroEnvioFoto by rememberSaveable { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
+    val contexto = LocalContext.current
 
     val detalhesCarregados = (detalhesUiState as? DetalhesProjetoUiState.Sucesso)?.detalhes
     val noDiario = abaSelecionada == ABA_DIARIO && detalhesCarregados != null
+    val noArquivos = abaSelecionada == ABA_ARQUIVOS && detalhesCarregados != null
+    // Diário e Arquivos: título do projeto no cabeçalho e sem o card de resumo (frames 35:2 e 35:231)
+    val cabecalhoDoProjeto = noDiario || noArquivos
     val tipoRegistro = detalhesCarregados?.tipoRegistroPara(usuario)
+    val podeEnviarArquivos = detalhesCarregados?.podeEnviarArquivos(usuario) == true
+    val arquivosCarregados = (listaArquivosUiState as? ListaArquivosUiState.Sucesso)?.arquivos
     // "Hoje"/"Ontem": recalculados a cada emissão do diário e na virada do dia, com a tela aberta
     var agora by remember { mutableStateOf(LocalDateTime.now()) }
     LaunchedEffect(listaRegistrosUiState) { agora = LocalDateTime.now() }
@@ -164,6 +212,124 @@ fun ProjetoDetalhesScreen(
             snackbarHostState.currentSnackbarData?.dismiss()
             snackbarHostState.showSnackbar(mensagem)
         }
+    }
+
+    // ===== Arquivos: câmera, seletores do sistema e abrir documento =====
+
+    val tirarFoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { gravou ->
+        val uri = uriCaptura
+        uriCaptura = null
+        if (gravou && uri != null) onPrepararFoto(Uri.parse(uri), true)
+    }
+    val escolherFoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { onPrepararFoto(it, false) }
+    }
+    val escolherDocumento = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(onEnviarDocumento)
+    }
+    val abrirCamera: () -> Unit = {
+        val uri = novaUriCaptura()
+        if (uri == null) {
+            mostrarMensagem("Nenhum app de câmera disponível.")
+        } else {
+            uriCaptura = uri.toString()
+            try {
+                tirarFoto.launch(uri)
+            } catch (_: ActivityNotFoundException) {
+                uriCaptura = null
+                mostrarMensagem("Nenhum app de câmera disponível.")
+            }
+        }
+    }
+    val abrirDocumento: (Arquivo) -> Unit = { arquivo ->
+        val uri = uriDoDocumento(arquivo)
+        if (uri == null) {
+            mostrarMensagem("Arquivo não encontrado neste aparelho.")
+        } else {
+            val intent = Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, arquivo.extensao.mime)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            try {
+                contexto.startActivity(intent)
+            } catch (_: ActivityNotFoundException) {
+                mostrarMensagem("Nenhum app para abrir este arquivo.")
+            }
+        }
+    }
+
+    LaunchedEffect(preparacaoFotoUiState) {
+        val estado = preparacaoFotoUiState
+        if (estado is PreparacaoFotoUiState.Erro) {
+            mostrarMensagem(estado.mensagem)
+            onPreparacaoFotoErroMostrado()
+        }
+    }
+
+    // Documento: o resultado sempre vira Snackbar (não há sheet aberto para ele)
+    LaunchedEffect(envioDocumentoUiState) {
+        when (val estado = envioDocumentoUiState) {
+            is EnvioArquivoUiState.Sucesso -> {
+                mostrarMensagem(estado.mensagem)
+                onEnvioDocumentoMensagemMostrada()
+            }
+            is EnvioArquivoUiState.Erro -> {
+                mostrarMensagem(estado.mensagem)
+                onEnvioDocumentoMensagemMostrada()
+            }
+            is EnvioArquivoUiState.SemPermissao -> {
+                enviarArquivoAberto = false
+                mostrarMensagem(estado.mensagem)
+                onEnvioDocumentoMensagemMostrada()
+            }
+            else -> Unit
+        }
+    }
+
+    // Foto: com o sheet de autorização aberto, o erro fica nele (o Snackbar ficaria atrás do sheet)
+    LaunchedEffect(envioFotoUiState) {
+        when (val estado = envioFotoUiState) {
+            is EnvioArquivoUiState.Sucesso -> {
+                erroEnvioFoto = null
+                mostrarMensagem(estado.mensagem)
+                onEnvioFotoMensagemMostrada()
+            }
+            is EnvioArquivoUiState.SemPermissao -> {
+                erroEnvioFoto = null
+                enviarArquivoAberto = false
+                mostrarMensagem(estado.mensagem)
+                onEnvioFotoMensagemMostrada()
+            }
+            is EnvioArquivoUiState.Erro -> {
+                if (preparacaoFotoUiState is PreparacaoFotoUiState.Pronta) {
+                    erroEnvioFoto = estado.mensagem
+                } else {
+                    mostrarMensagem(estado.mensagem)
+                }
+                onEnvioFotoMensagemMostrada()
+            }
+            else -> Unit
+        }
+    }
+
+    LaunchedEffect(exclusaoArquivoUiState) {
+        when (val estado = exclusaoArquivoUiState) {
+            is ExclusaoArquivoUiState.Sucesso -> {
+                fotoAbertaId = null
+                mostrarMensagem(estado.mensagem)
+                onExclusaoArquivoMensagemMostrada()
+            }
+            is ExclusaoArquivoUiState.Erro -> {
+                mostrarMensagem(estado.mensagem)
+                onExclusaoArquivoMensagemMostrada()
+            }
+            else -> Unit
+        }
+    }
+
+    // Foto aberta que sumiu da lista (excluída, inclusive em outro aparelho): fecha o sheet
+    LaunchedEffect(arquivosCarregados, fotoAbertaId) {
+        val id = fotoAbertaId ?: return@LaunchedEffect
+        if (arquivosCarregados != null && arquivosCarregados.fotosEnviadas.none { it.foto.id == id }) fotoAbertaId = null
     }
 
     LaunchedEffect(mudarEstagioUiState) {
@@ -258,13 +424,13 @@ fun ProjetoDetalhesScreen(
     Scaffold(
         topBar = {
             AppTopBar(
-                title = if (noDiario) detalhesCarregados.projeto.titulo else "Projeto",
-                subtitle = if (noDiario) {
+                title = if (cabecalhoDoProjeto) detalhesCarregados.projeto.titulo else "Projeto",
+                subtitle = if (cabecalhoDoProjeto) {
                     "Grupo ${detalhesCarregados.projeto.nomeGrupo} · ${detalhesCarregados.projeto.estagio.titulo}"
                 } else {
                     null
                 },
-                compactTitle = noDiario,
+                compactTitle = cabecalhoDoProjeto,
                 navigationIcon = {
                     IconButton(onClick = onVoltarClick) {
                         Icon(imageVector = Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Voltar", tint = Color.White)
@@ -302,6 +468,22 @@ fun ProjetoDetalhesScreen(
                     shape = RoundedCornerShape(16.dp)
                 )
             }
+            // Só na aba Arquivos e para quem envia (participante ou orientador, projeto não finalizado)
+            if (noArquivos && podeEnviarArquivos) {
+                ExtendedFloatingActionButton(
+                    onClick = { enviarArquivoAberto = true },
+                    icon = { Icon(imageVector = Icons.Outlined.FileUpload, contentDescription = null, modifier = Modifier.size(22.dp)) },
+                    text = {
+                        Text(
+                            text = "Enviar",
+                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        )
+                    },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = RoundedCornerShape(16.dp)
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background
@@ -330,16 +512,16 @@ fun ProjetoDetalhesScreen(
                 LazyColumn(
                     modifier = Modifier.fillMaxSize().padding(innerPadding),
                     state = listState,
-                    // No Diário, o último card rola até ficar acima do FAB (56dp + margens)
+                    // No Diário e em Arquivos, o último card rola até ficar acima do FAB (56dp + margens)
                     contentPadding = PaddingValues(
                         start = 20.dp,
                         end = 20.dp,
-                        top = if (noDiario) 12.dp else 16.dp,
-                        bottom = if (noDiario && tipoRegistro != null) 96.dp else 32.dp
+                        top = if (cabecalhoDoProjeto) 12.dp else 16.dp,
+                        bottom = if ((noDiario && tipoRegistro != null) || (noArquivos && podeEnviarArquivos)) 96.dp else 32.dp
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    if (abaSelecionada != ABA_DIARIO) {
+                    if (abaSelecionada == ABA_VISAO_GERAL) {
                         item(key = "resumo") {
                             CardResumo(
                                 detalhes = detalhes,
@@ -395,8 +577,72 @@ fun ProjetoDetalhesScreen(
                             onTentarNovamente = onTentarNovamenteDiario
                         )
                     } else {
-                        item(key = "em-breve") { AbaEmBreve() }
+                        abaArquivos(
+                            listaUiState = listaArquivosUiState,
+                            usuarioId = usuario.id,
+                            hoje = hoje,
+                            podeExcluir = { autorId -> detalhes.podeGerenciarArquivo(usuario, autorId) },
+                            onFotoClick = { fotoAbertaId = it.foto.id },
+                            onAbrirDocumento = { abrirDocumento(it.arquivo) },
+                            onExcluirDocumento = { documentoParaExcluir = it.arquivo.id },
+                            onTentarNovamente = onTentarNovamenteArquivos
+                        )
                     }
+                }
+
+                if (enviarArquivoAberto && podeEnviarArquivos) {
+                    EnviarArquivoBottomSheet(
+                        onTirarFoto = abrirCamera,
+                        onEscolherFoto = {
+                            escolherFoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                        onEscolherDocumento = {
+                            escolherDocumento.launch(FormatoDocumento.entries.map { it.mime }.toTypedArray())
+                        },
+                        onDispensar = { enviarArquivoAberto = false }
+                    )
+                }
+
+                // Aberto enquanto comprime (prévia com indicador) e depois com a foto pronta
+                val fotoPreparada = (preparacaoFotoUiState as? PreparacaoFotoUiState.Pronta)?.foto
+                if (fotoPreparada != null || preparacaoFotoUiState is PreparacaoFotoUiState.Preparando) {
+                    AutorizarDivulgacaoBottomSheet(
+                        foto = fotoPreparada,
+                        enviando = envioFotoUiState is EnvioArquivoUiState.Enviando,
+                        erro = erroEnvioFoto,
+                        onEnviar = { autorizada ->
+                            erroEnvioFoto = null
+                            onEnviarFoto(autorizada)
+                        },
+                        onDispensar = {
+                            erroEnvioFoto = null
+                            onDescartarFoto()
+                        }
+                    )
+                }
+
+                val fotoAberta = fotoAbertaId?.let { id -> arquivosCarregados?.fotosEnviadas?.firstOrNull { it.foto.id == id } }
+                if (fotoAberta != null) {
+                    FotoBottomSheet(
+                        detalhes = fotoAberta,
+                        hoje = hoje,
+                        podeGerenciar = detalhes.podeGerenciarArquivo(usuario, fotoAberta.foto.autorId),
+                        onAlterarAutorizacao = { onAlterarAutorizacaoMural(fotoAberta.foto.id, it) },
+                        onExcluir = { onExcluirFoto(fotoAberta.foto.id) },
+                        onDispensar = { fotoAbertaId = null }
+                    )
+                }
+
+                documentoParaExcluir?.let { arquivoId ->
+                    val nome = arquivosCarregados?.documentos?.firstOrNull { it.arquivo.id == arquivoId }?.arquivo?.nomeArquivo.orEmpty()
+                    ConfirmacaoExclusaoArquivoDialog(
+                        texto = "Deseja realmente excluir o documento \"$nome\"?",
+                        onConfirmar = {
+                            documentoParaExcluir = null
+                            onExcluirDocumento(arquivoId)
+                        },
+                        onDispensar = { documentoParaExcluir = null }
+                    )
                 }
 
                 if (novoRegistroAberto && tipoRegistro != null) {
@@ -669,7 +915,26 @@ private fun ProjetoDetalhesScreenPreview() {
             onExcluirRegistro = {},
             onTentarNovamenteDiario = {},
             onSalvarRegistroMensagemMostrada = {},
-            onExclusaoRegistroMensagemMostrada = {}
+            onExclusaoRegistroMensagemMostrada = {},
+            listaArquivosUiState = ListaArquivosUiState.Carregando,
+            preparacaoFotoUiState = PreparacaoFotoUiState.Ocioso,
+            envioDocumentoUiState = EnvioArquivoUiState.Ocioso,
+            envioFotoUiState = EnvioArquivoUiState.Ocioso,
+            exclusaoArquivoUiState = ExclusaoArquivoUiState.Ocioso,
+            onEnviarDocumento = {},
+            onPrepararFoto = { _, _ -> },
+            onEnviarFoto = {},
+            onDescartarFoto = {},
+            onAlterarAutorizacaoMural = { _, _ -> },
+            onExcluirDocumento = {},
+            onExcluirFoto = {},
+            novaUriCaptura = { null },
+            uriDoDocumento = { null },
+            onTentarNovamenteArquivos = {},
+            onPreparacaoFotoErroMostrado = {},
+            onEnvioDocumentoMensagemMostrada = {},
+            onEnvioFotoMensagemMostrada = {},
+            onExclusaoArquivoMensagemMostrada = {}
         )
     }
 }

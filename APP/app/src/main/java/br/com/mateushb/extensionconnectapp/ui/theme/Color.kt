@@ -29,3 +29,19 @@ val TextMutedDark = Color(0xFF6B7280)
 val OutlineDark = Color(0xFF3A3A3A)
 val PinkContainerDark = Color(0xFF4A1030)
 val ErrorContainerDark = Color(0xFF3B1414)
+
+// Aba Arquivos (spec 006, frame 35:231)
+val InfoBlue = Color(0xFF2563EB) // selo DOCX (fundo: InfoContainerLight)
+val SuccessContainerLight = Color(0xFFF0FDF4) // fundo do selo XLSX
+val SuccessGreenStrong = Color(0xFF16A34A) // selo XLSX
+
+// Gradientes (135°, cor clara → escura em 50%) das fotos do Figma: placeholder da miniatura enquanto a
+// imagem carrega ou quando o arquivo não existe no aparelho
+val GradientesFoto: List<Pair<Color, Color>> = listOf(
+    Color(0xFFA7D7A0) to Color(0xFF5E9E58),
+    Color(0xFFF7C59F) to Color(0xFFE07A3E),
+    Color(0xFF9DC3E6) to Color(0xFF3D7FB8),
+    Color(0xFFC9E4A5) to Color(0xFF7DAA45),
+    Color(0xFFF4D58D) to Color(0xFFC99A2E),
+    Color(0xFFD7B8E8) to Color(0xFF8F5BB0)
+)
