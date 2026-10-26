@@ -81,8 +81,8 @@ import br.com.mateushb.extensionconnectapp.model.Usuario
 import br.com.mateushb.extensionconnectapp.ui.components.AppCard
 import br.com.mateushb.extensionconnectapp.ui.components.AppTextField
 import br.com.mateushb.extensionconnectapp.ui.components.AppTopBar
+import br.com.mateushb.extensionconnectapp.ui.components.ErrorRetry
 import br.com.mateushb.extensionconnectapp.ui.components.AvatarStack
-import br.com.mateushb.extensionconnectapp.ui.components.PrimaryButton
 import br.com.mateushb.extensionconnectapp.ui.components.SegmentedTabs
 import br.com.mateushb.extensionconnectapp.ui.components.StatusChip
 import br.com.mateushb.extensionconnectapp.ui.components.StatusTone
@@ -90,7 +90,6 @@ import br.com.mateushb.extensionconnectapp.ui.state.ListaProjetosUiState
 import br.com.mateushb.extensionconnectapp.ui.theme.ExtensionConnectAPPTheme
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 private const val ABA_LISTA = 0
 private const val ABA_QUADRO = 1
@@ -109,7 +108,9 @@ fun ProjetosListaScreen(
     onAlternarSouOrientador: () -> Unit,
     onAlternarSoParados: () -> Unit,
     onLimparFiltros: () -> Unit,
-    onTentarNovamente: () -> Unit
+    onTentarNovamente: () -> Unit,
+    onAdicionarClick: () -> Unit,
+    onProjetoClick: (projetoId: Int) -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val escopo = rememberCoroutineScope()
@@ -117,7 +118,7 @@ fun ProjetosListaScreen(
     var abaSelecionada by rememberSaveable { mutableIntStateOf(ABA_LISTA) }
     var filtrosAbertos by rememberSaveable { mutableStateOf(false) }
 
-    // Detalhe (feature 4), criação (feature 3) e menu do card ainda não existem
+    // Menu ⋮ do card ainda não existe (feature 4)
     val mostrarEmBreve: () -> Unit = {
         escopo.launch {
             snackbarHostState.currentSnackbarData?.dismiss()
@@ -125,8 +126,8 @@ fun ProjetosListaScreen(
         }
     }
 
-    val alunoSemProjetos = usuario.perfil == PerfilUsuario.ALUNO &&
-        listaUiState is ListaProjetosUiState.Sucesso && !listaUiState.existemProjetos
+    // Quem cria projeto é Professor ou Administrador (spec 003, HU-01)
+    val podeCriarProjeto = usuario.perfil != PerfilUsuario.ALUNO
 
     Scaffold(
         topBar = {
@@ -155,9 +156,9 @@ fun ProjetosListaScreen(
             }
         },
         floatingActionButton = {
-            if (listaUiState is ListaProjetosUiState.Sucesso && !alunoSemProjetos) {
+            if (listaUiState is ListaProjetosUiState.Sucesso && podeCriarProjeto) {
                 FloatingActionButton(
-                    onClick = mostrarEmBreve,
+                    onClick = onAdicionarClick,
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     shape = RoundedCornerShape(16.dp)
@@ -204,13 +205,13 @@ fun ProjetosListaScreen(
                 }
 
                 is ListaProjetosUiState.Erro -> {
-                    ErroCarregamento(mensagem = listaUiState.mensagem, onTentarNovamente = onTentarNovamente)
+                    ErrorRetry(message = listaUiState.mensagem, onRetry = onTentarNovamente, modifier = Modifier.fillMaxSize())
                 }
 
                 is ListaProjetosUiState.Sucesso -> {
                     when {
                         !listaUiState.existemProjetos && usuario.perfil == PerfilUsuario.ALUNO ->
-                            AlunoSemProjetos(onCriarProjetoClick = mostrarEmBreve)
+                            AlunoSemProjetos()
 
                         !listaUiState.existemProjetos ->
                             MensagemCentral("Nenhum projeto cadastrado")
@@ -223,7 +224,7 @@ fun ProjetosListaScreen(
                                 filtroAtual = filtroAtual,
                                 onAlternarSouOrientador = onAlternarSouOrientador,
                                 onAlternarSoParados = onAlternarSoParados,
-                                onProjetoClick = mostrarEmBreve,
+                                onProjetoClick = onProjetoClick,
                                 onMaisClick = mostrarEmBreve,
                                 onLimparFiltros = onLimparFiltros
                             )
@@ -240,7 +241,7 @@ fun ProjetosListaScreen(
                                     ProjetoCard(
                                         resumo = resumo,
                                         hoje = listaUiState.hoje,
-                                        onClick = mostrarEmBreve,
+                                        onClick = { onProjetoClick(resumo.projeto.id) },
                                         onMaisClick = mostrarEmBreve
                                     )
                                 }
@@ -268,28 +269,6 @@ fun ProjetosListaScreen(
 // ===== Estados de conteúdo =====
 
 @Composable
-private fun ErroCarregamento(mensagem: String, onTentarNovamente: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = mensagem,
-            color = MaterialTheme.colorScheme.error,
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.height(16.dp))
-        OutlinedButton(onClick = onTentarNovamente) {
-            Text("Tentar novamente")
-        }
-    }
-}
-
-@Composable
 private fun MensagemCentral(texto: String) {
     Box(
         modifier = Modifier
@@ -306,9 +285,9 @@ private fun MensagemCentral(texto: String) {
     }
 }
 
-// Frame 33:200
+// Frame 33:200, sem o botão "Criar projeto": aluno não cria projeto (spec 003)
 @Composable
-private fun AlunoSemProjetos(onCriarProjetoClick: () -> Unit) {
+private fun AlunoSemProjetos() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -341,12 +320,6 @@ private fun AlunoSemProjetos(onCriarProjetoClick: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
-        )
-        PrimaryButton(
-            text = "Criar projeto",
-            onClick = onCriarProjetoClick,
-            leadingIcon = Icons.Outlined.Add,
-            fullWidth = false
         )
     }
 }
@@ -560,13 +533,12 @@ internal fun EstagioProjeto.tom(): StatusTone = when (this) {
     EstagioProjeto.FINALIZADO -> StatusTone.Green
 }
 
-private val FORMATO_DIA_MES: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM")
 
 private fun periodoAplicacao(projeto: Projeto): String? {
     val inicio = projeto.aplicacaoInicio ?: return null
     val fim = projeto.aplicacaoFim ?: return null
     return try {
-        "Aplicação ${LocalDate.parse(inicio).format(FORMATO_DIA_MES)} – ${LocalDate.parse(fim).format(FORMATO_DIA_MES)}"
+        "Aplicação ${LocalDate.parse(inicio).formatarDiaMes()} – ${LocalDate.parse(fim).formatarDiaMes()}"
     } catch (_: Exception) {
         null
     }
@@ -580,7 +552,7 @@ private fun textoDiasNoEstagio(dias: Int?): String? = when (dias) {
 }
 
 // "Mateus Silva" → "MS"; nome de uma palavra → primeira letra
-private fun iniciais(nome: String): String {
+internal fun iniciais(nome: String): String {
     val partes = nome.trim().split(" ").filter { it.isNotBlank() }
     return when {
         partes.isEmpty() -> "?"
@@ -622,7 +594,7 @@ private fun ProjetosListaScreenPreview() {
             busca = "",
             filtroAtual = FiltroProjetos(),
             onBuscaChange = {}, onAplicarFiltro = {}, onAlternarSouOrientador = {}, onAlternarSoParados = {},
-            onLimparFiltros = {}, onTentarNovamente = {}
+            onLimparFiltros = {}, onTentarNovamente = {}, onAdicionarClick = {}, onProjetoClick = {}
         )
     }
 }
@@ -637,7 +609,7 @@ private fun ProjetosListaVazioPreview() {
             busca = "",
             filtroAtual = FiltroProjetos(),
             onBuscaChange = {}, onAplicarFiltro = {}, onAlternarSouOrientador = {}, onAlternarSoParados = {},
-            onLimparFiltros = {}, onTentarNovamente = {}
+            onLimparFiltros = {}, onTentarNovamente = {}, onAdicionarClick = {}, onProjetoClick = {}
         )
     }
 }

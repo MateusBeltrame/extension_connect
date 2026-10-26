@@ -16,6 +16,9 @@ val PinkContainerLight = Color(0xFFFDE7F3) // círculo do ícone em "Verifique s
 val ErrorRed = Color(0xFFDC2626) // texto/ícone do aviso de erro (frames 32:59 e 32:117)
 val ErrorContainerLight = Color(0xFFFEF2F2) // fundo do aviso de erro
 val SuccessGreen = Color(0xFF10B981) // check de confirmação de senha (frame 32:176)
+val WarningAmber = Color(0xFFB45309) // data de etapa fora do período e "Limite atingido" (frames 37:109, 37:393)
+val WarningContainerLight = Color(0xFFFFFBEB) // fundo do contador de participantes no limite (frame 37:393)
+val WarningOutlineLight = Color(0xFFFCD34D) // borda do contador de participantes no limite
 
 // O Figma não define uma variante escura; valores abaixo preservam a marca (rosa + fundo quase preto
 // já usado no gradiente do cabeçalho) e seguem a escala neutra padrão do Material 3 para contraste.

@@ -64,7 +64,7 @@ internal fun ProjetosQuadro(
     filtroAtual: FiltroProjetos,
     onAlternarSouOrientador: () -> Unit,
     onAlternarSoParados: () -> Unit,
-    onProjetoClick: () -> Unit,
+    onProjetoClick: (projetoId: Int) -> Unit,
     onMaisClick: () -> Unit,
     onLimparFiltros: () -> Unit
 ) {
@@ -212,7 +212,7 @@ private fun ColunaEstagio(
     hoje: LocalDate,
     expandida: Boolean,
     onAlternarExpandida: () -> Unit,
-    onProjetoClick: () -> Unit,
+    onProjetoClick: (projetoId: Int) -> Unit,
     onMaisClick: () -> Unit
 ) {
     val tom = estagio.tom()
@@ -264,7 +264,7 @@ private fun ColunaEstagio(
         } else {
             val visiveis = if (expandida) projetos else projetos.take(CARDS_POR_COLUNA)
             visiveis.forEach { resumo ->
-                ProjetoCard(resumo = resumo, hoje = hoje, onClick = onProjetoClick, onMaisClick = onMaisClick)
+                ProjetoCard(resumo = resumo, hoje = hoje, onClick = { onProjetoClick(resumo.projeto.id) }, onMaisClick = onMaisClick)
             }
             if (projetos.size > CARDS_POR_COLUNA) {
                 Box(

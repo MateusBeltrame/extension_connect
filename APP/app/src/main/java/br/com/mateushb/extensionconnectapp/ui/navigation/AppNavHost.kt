@@ -45,18 +45,24 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import br.com.mateushb.extensionconnectapp.model.PerfilUsuario
 import br.com.mateushb.extensionconnectapp.model.Usuario
 import br.com.mateushb.extensionconnectapp.ui.state.CadastroUiState
 import br.com.mateushb.extensionconnectapp.ui.state.CompletarCadastroUiState
 import br.com.mateushb.extensionconnectapp.ui.state.LoginUiState
+import br.com.mateushb.extensionconnectapp.ui.state.SalvarProjetoUiState
 import br.com.mateushb.extensionconnectapp.ui.state.SessaoUiState
 import br.com.mateushb.extensionconnectapp.ui.telas.AcessoScreen
 import br.com.mateushb.extensionconnectapp.ui.telas.CompletarCadastroScreen
 import br.com.mateushb.extensionconnectapp.ui.telas.EmBreveScreen
+import br.com.mateushb.extensionconnectapp.ui.telas.NovoProjetoScreen
+import br.com.mateushb.extensionconnectapp.ui.telas.ProjetoDetalhesScreen
 import br.com.mateushb.extensionconnectapp.ui.telas.ProjetosListaScreen
 import br.com.mateushb.extensionconnectapp.ui.telas.RecuperarSenhaScreen
 import br.com.mateushb.extensionconnectapp.ui.viewmodel.AutenticacaoViewModel
+import br.com.mateushb.extensionconnectapp.ui.viewmodel.NovoProjetoViewModel
+import br.com.mateushb.extensionconnectapp.ui.viewmodel.ProjetoDetalhesViewModel
 import br.com.mateushb.extensionconnectapp.ui.viewmodel.ProjetoViewModel
 
 @Composable
@@ -244,9 +250,88 @@ fun AppNavHost(
                         onAlternarSouOrientador = { projetoViewModel.alternarSouOrientador() },
                         onAlternarSoParados = { projetoViewModel.alternarSoParados() },
                         onLimparFiltros = { projetoViewModel.limparFiltros() },
-                        onTentarNovamente = { projetoViewModel.carregarProjetos(usuario) }
+                        onTentarNovamente = { projetoViewModel.carregarProjetos(usuario) },
+                        onAdicionarClick = {
+                            navController.navigate(AppRoute.NovoProjeto) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onProjetoClick = { projetoId ->
+                            navController.navigate(AppRoute.ProjetoDetalhes(projetoId)) {
+                                launchSingleTop = true
+                            }
+                        }
                     )
                 }
+            }
+
+            composable<AppRoute.NovoProjeto> { entrada ->
+                val usuario = usuarioDaRota(autenticacaoViewModel.usuarioLogado) { redirecionarSemSessao(entrada) }
+                    ?: return@composable
+
+                // Aluno não cria projeto (spec 003): pilha restaurada com outro perfil volta para a lista
+                if (usuario.perfil == PerfilUsuario.ALUNO) {
+                    LaunchedEffect(Unit) { navController.popBackStack<AppRoute.NovoProjeto>(inclusive = true) }
+                    return@composable
+                }
+
+                // Escopo da entrada: o rascunho do wizard morre quando ela sai da pilha
+                val novoProjetoViewModel: NovoProjetoViewModel = viewModel()
+                val salvarUiState = novoProjetoViewModel.salvarUiState
+
+                LaunchedEffect(usuario) {
+                    novoProjetoViewModel.iniciar(usuario)
+                }
+
+                // Salvou: abre os detalhes tirando o wizard da pilha (o voltar leva a Projetos)
+                LaunchedEffect(salvarUiState) {
+                    if (salvarUiState is SalvarProjetoUiState.Sucesso) {
+                        novoProjetoViewModel.limparSalvarUiState()
+                        navController.navigate(AppRoute.ProjetoDetalhes(salvarUiState.projetoId)) {
+                            popUpTo<AppRoute.NovoProjeto> {
+                                inclusive = true
+                            }
+                        }
+                    }
+                }
+
+                NovoProjetoScreen(
+                    formularioUiState = novoProjetoViewModel.formularioUiState,
+                    salvarUiState = salvarUiState,
+                    rascunho = novoProjetoViewModel.rascunho,
+                    passoAtual = novoProjetoViewModel.passoAtual,
+                    orientadorInicial = novoProjetoViewModel.orientadorInicial,
+                    onRascunhoChange = { novoProjetoViewModel.alterarRascunho(it) },
+                    onAvancarClick = { novoProjetoViewModel.avancarPasso() },
+                    onVoltarClick = { novoProjetoViewModel.voltarPasso() },
+                    onAdicionarEtapa = { novoProjetoViewModel.adicionarEtapa(it) },
+                    onRemoverEtapa = { novoProjetoViewModel.removerEtapa(it) },
+                    onMoverEtapa = { de, para -> novoProjetoViewModel.moverEtapa(de, para) },
+                    onAdicionarParticipante = { novoProjetoViewModel.adicionarParticipante(it) },
+                    onRemoverParticipante = { novoProjetoViewModel.removerParticipante(it) },
+                    onSalvarClick = { novoProjetoViewModel.salvar(usuario) },
+                    onFecharClick = { voltarSeAtiva(navController, entrada) },
+                    onTentarNovamente = { novoProjetoViewModel.carregarDados() },
+                    onErroMostrado = { novoProjetoViewModel.limparSalvarUiState() }
+                )
+            }
+
+            composable<AppRoute.ProjetoDetalhes> { entrada ->
+                usuarioDaRota(autenticacaoViewModel.usuarioLogado) { redirecionarSemSessao(entrada) }
+                    ?: return@composable
+                val projetoId = entrada.toRoute<AppRoute.ProjetoDetalhes>().projetoId
+
+                val detalhesViewModel: ProjetoDetalhesViewModel = viewModel()
+
+                LaunchedEffect(projetoId) {
+                    detalhesViewModel.carregarDetalhesProjeto(projetoId)
+                }
+
+                ProjetoDetalhesScreen(
+                    detalhesUiState = detalhesViewModel.detalhesUiState,
+                    onVoltarClick = { voltarSeAtiva(navController, entrada) },
+                    onTentarNovamente = { detalhesViewModel.carregarDetalhesProjeto(projetoId) }
+                )
             }
 
             // ============================
@@ -375,6 +460,13 @@ private fun usuarioDaRota(usuarioLogado: Usuario?, onSemSessao: () -> Unit): Usu
         if (usuarioLogado == null) onSemSessao()
     }
     return usuarioLogado ?: ultimoUsuario.value
+}
+
+// Só a entrada ativa volta: um segundo toque durante a transição desempilharia a tela de baixo
+private fun voltarSeAtiva(navController: NavHostController, entrada: NavBackStackEntry) {
+    if (entrada.lifecycle.currentState == Lifecycle.State.RESUMED) {
+        navController.popBackStack()
+    }
 }
 
 // Aluno sem RA/curso passa pelo gate antes de entrar no app

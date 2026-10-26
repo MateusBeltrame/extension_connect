@@ -23,7 +23,7 @@ import br.com.mateushb.extensionconnectapp.data.local.entity.UsuarioEntity
         ProjetoParticipanteEntity::class,
         HistoricoEstagioEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -44,6 +44,7 @@ abstract class AppDatabase : RoomDatabase() {
                 val senhaHash = SeedDebug.gerarSenhaHashPadrao()
                 SeedDebug.inserirUsuariosIniciais(db, senhaHash)
                 SeedDebug.inserirProjetosExemplo(db, senhaHash)
+                SeedDebug.inserirAlunosNovoProjeto(db, senhaHash)
             }
         }
 
@@ -123,6 +124,14 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Spec 003: schema sem mudança. Existe só para o banco debug já existente receber os alunos de
+        // teste do wizard "Novo projeto"; no release é uma migração vazia
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                if (BuildConfig.DEBUG) SeedDebug.inserirAlunosNovoProjeto(db, SeedDebug.gerarSenhaHashPadrao())
+            }
+        }
+
         fun obterInstancia(context: Context): AppDatabase {
             // Confere de novo dentro do lock: duas threads podem ter visto INSTANCE nulo
             return INSTANCE ?: synchronized(this) {
@@ -139,7 +148,7 @@ abstract class AppDatabase : RoomDatabase() {
                 AppDatabase::class.java,
                 "extension_connect_database.db"
             )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             if (BuildConfig.DEBUG) builder.addCallback(SEED_CALLBACK)
             return builder.build()
         }
