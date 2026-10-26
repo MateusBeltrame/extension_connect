@@ -13,7 +13,8 @@ import br.com.mateushb.extensionconnectapp.data.local.entity.ProjetoEntity
 import br.com.mateushb.extensionconnectapp.data.local.entity.ProjetoParticipanteEntity
 import kotlinx.coroutines.flow.Flow
 
-// Criar projeto entrou na feature 3 (Novo projeto); editar e mudar estágio entram na feature 4
+// Criar projeto entrou na feature 3 (Novo projeto); mudar estágio, ciência e etapa concluída na feature 4.
+// Editar projeto/etapas (e um EtapaDao próprio) fica para a feature de edição
 @Dao
 interface ProjetoDao {
 
@@ -28,8 +29,9 @@ interface ProjetoDao {
     )
     fun observarProjetosCompletosDoAluno(alunoId: Int): Flow<List<ProjetoComRelacoes>>
 
+    @Transaction
     @Query("SELECT * FROM projetos WHERE id = :id")
-    fun observarProjetoPorId(id: Int): Flow<ProjetoEntity?>
+    fun observarProjetoCompletoPorId(id: Int): Flow<ProjetoComRelacoes?>
 
     // Aluno só pode estar em um projeto não finalizado por vez (05-dominio.md)
     @Query(
@@ -85,4 +87,48 @@ interface ProjetoDao {
         inserirHistorico(historico.copy(projetoId = projetoId))
         return projetoId
     }
+
+    // ===== Ciclo de estágio e cronograma (spec 004) =====
+
+    @Query("SELECT estagio FROM projetos WHERE id = :id")
+    suspend fun buscarEstagio(id: Int): String?
+
+    @Query("UPDATE projetos SET estagio = :estagio, aguardando_ciencia_orientador = :aguardandoCiencia WHERE id = :id")
+    suspend fun atualizarEstagio(id: Int, estagio: String, aguardandoCiencia: Boolean)
+
+    @Query(
+        "UPDATE projetos SET aplicacao_inicio = :inicio, aplicacao_fim = :fim, " +
+            "aplicacao_descricao = :descricao WHERE id = :id"
+    )
+    suspend fun atualizarAplicacao(id: Int, inicio: String, fim: String, descricao: String)
+
+    // Confere o estágio de origem na mesma transação: se mudou desde que a tela leu (outro aparelho,
+    // toque duplo), não grava nada. Aplicação nula mantém a atual (ao voltar, ela reaparece no 7a)
+    @Transaction
+    suspend fun mudarEstagio(
+        projetoId: Int,
+        origem: String,
+        destino: String,
+        aguardandoCiencia: Boolean,
+        aplicacaoInicio: String?,
+        aplicacaoFim: String?,
+        aplicacaoDescricao: String?,
+        historico: HistoricoEstagioEntity
+    ): Boolean {
+        if (buscarEstagio(projetoId) != origem) return false
+        if (aplicacaoInicio != null && aplicacaoFim != null && aplicacaoDescricao != null) {
+            atualizarAplicacao(projetoId, aplicacaoInicio, aplicacaoFim, aplicacaoDescricao)
+        }
+        atualizarEstagio(projetoId, destino, aguardandoCiencia)
+        inserirHistorico(historico)
+        return true
+    }
+
+    @Query("UPDATE projetos SET aguardando_ciencia_orientador = 0 WHERE id = :id")
+    suspend fun confirmarCiencia(id: Int)
+
+    // Inverte no próprio banco: dois toques rápidos alternam duas vezes, em vez de gravar o mesmo valor
+    // lido de um estado de tela ainda desatualizado (revisão da spec 004)
+    @Query("UPDATE etapas SET concluida = NOT concluida WHERE id = :etapaId")
+    suspend fun alternarConclusaoEtapa(etapaId: Int)
 }

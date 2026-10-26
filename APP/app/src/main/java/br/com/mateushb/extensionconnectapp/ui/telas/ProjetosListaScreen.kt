@@ -78,6 +78,7 @@ import br.com.mateushb.extensionconnectapp.model.PerfilUsuario
 import br.com.mateushb.extensionconnectapp.model.Projeto
 import br.com.mateushb.extensionconnectapp.model.ProjetoResumo
 import br.com.mateushb.extensionconnectapp.model.Usuario
+import br.com.mateushb.extensionconnectapp.model.lerDataIso
 import br.com.mateushb.extensionconnectapp.ui.components.AppCard
 import br.com.mateushb.extensionconnectapp.ui.components.AppTextField
 import br.com.mateushb.extensionconnectapp.ui.components.AppTopBar
@@ -472,7 +473,7 @@ fun ProjetoCard(
 }
 
 @Composable
-private fun ChipComIcone(label: String, tone: StatusTone, icone: ImageVector) {
+internal fun ChipComIcone(label: String, tone: StatusTone, icone: ImageVector) {
     StatusChip(
         label = label,
         tone = tone,
@@ -535,13 +536,9 @@ internal fun EstagioProjeto.tom(): StatusTone = when (this) {
 
 
 private fun periodoAplicacao(projeto: Projeto): String? {
-    val inicio = projeto.aplicacaoInicio ?: return null
-    val fim = projeto.aplicacaoFim ?: return null
-    return try {
-        "Aplicação ${LocalDate.parse(inicio).formatarDiaMes()} – ${LocalDate.parse(fim).formatarDiaMes()}"
-    } catch (_: Exception) {
-        null
-    }
+    val inicio = lerDataIso(projeto.aplicacaoInicio) ?: return null
+    val fim = lerDataIso(projeto.aplicacaoFim) ?: return null
+    return "Aplicação ${inicio.formatarDiaMes()} – ${fim.formatarDiaMes()}"
 }
 
 private fun textoDiasNoEstagio(dias: Int?): String? = when (dias) {
