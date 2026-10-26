@@ -34,9 +34,12 @@ sealed interface AppRoute {
     @Serializable
     data class EditarPessoa(val usuarioId: Int) : AppRoute
 
-    // Agrupamento de Telas: Perfil (provisória até a feature 8)
+    // Agrupamento de Telas: Perfil (spec 008)
     @Serializable
     data object MeuPerfil : AppRoute
+
+    @Serializable
+    data object TrocarSenha : AppRoute
 
     // Agrupamento de Telas: Mural (provisória até a feature 9)
     @Serializable

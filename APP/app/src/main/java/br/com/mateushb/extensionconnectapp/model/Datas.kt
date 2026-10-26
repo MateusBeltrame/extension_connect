@@ -41,6 +41,9 @@ fun dataCurta(iso: String?, hoje: LocalDate): String {
     return if (dia.year == hoje.year) dia.format(FORMATO_DIA_MES) else dia.format(FORMATO_DATA_COMPLETA)
 }
 
+// "dd/MM/aaaa" no fuso do aparelho ("Termos aceitos em", spec 008); data ausente ou inválida vira null
+fun dataCompleta(iso: String?): String? = dataLocalDoInstante(iso)?.format(FORMATO_DATA_COMPLETA)
+
 // "85 KB" abaixo de 1 MB (mínimo 1 KB) e "1,2 MB" a partir dele, na base 1024 como o Figma. Compara
 // depois de arredondar: 1023,9 KB vira "1,0 MB", não "1024 KB"
 fun formatarTamanho(bytes: Long): String {

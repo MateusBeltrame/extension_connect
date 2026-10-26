@@ -9,19 +9,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.ErrorOutline
-import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PersonOff
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
@@ -45,8 +40,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -59,7 +52,6 @@ import br.com.mateushb.extensionconnectapp.ui.components.SegmentedTabs
 import br.com.mateushb.extensionconnectapp.ui.state.CadastroUiState
 import br.com.mateushb.extensionconnectapp.ui.state.LoginUiState
 import br.com.mateushb.extensionconnectapp.ui.theme.ExtensionConnectAPPTheme
-import br.com.mateushb.extensionconnectapp.ui.theme.SuccessGreen
 
 private const val ABA_ENTRAR = 0
 private const val ABA_CADASTRAR = 1
@@ -310,57 +302,6 @@ private fun ColumnScope.CadastrarConteudo(
 }
 
 // ===== Composables auxiliares =====
-
-@Composable
-private fun CampoSenha(
-    valor: String,
-    onValorChange: (String) -> Unit,
-    rotulo: String,
-    visivel: Boolean,
-    onAlternarVisibilidade: () -> Unit,
-    erro: String?,
-    imeAction: ImeAction,
-    ajuda: String? = null,
-    confirmado: Boolean = false
-) {
-    AppTextField(
-        value = valor,
-        onValueChange = onValorChange,
-        placeholder = "••••••••",
-        label = rotulo,
-        leadingIcon = { IconeCampo(Icons.Outlined.Lock) },
-        trailingIcon = {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Área de toque de 32dp; o offset mantém o ícone a 12dp da borda como no Figma
-                Box(
-                    modifier = Modifier
-                        .offset(x = if (confirmado) 0.dp else 7.dp)
-                        .size(32.dp)
-                        .clickable(onClick = onAlternarVisibilidade),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = if (visivel) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                        contentDescription = if (visivel) "Ocultar senha" else "Mostrar senha",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                if (confirmado) {
-                    Icon(
-                        imageVector = Icons.Outlined.CheckCircle,
-                        contentDescription = "Senhas conferem",
-                        tint = SuccessGreen,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-        },
-        visualTransformation = if (visivel) VisualTransformation.None else PasswordVisualTransformation(),
-        supportingText = erro ?: ajuda,
-        isError = erro != null,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = imeAction)
-    )
-}
 
 @Composable
 private fun AceiteTermos(

@@ -37,21 +37,28 @@ fun SecondaryButton(
     leadingIcon: ImageVector? = null,
     fullWidth: Boolean = true,
     accent: Boolean = false,
-    compact: Boolean = false
+    compact: Boolean = false,
+    destructive: Boolean = false
 ) {
+    // destructive (spec 008, "Sair da conta" do frame 36:482): borda de 1,5dp e conteúdo vermelhos
+    val corDestaque = when {
+        destructive -> MaterialTheme.colorScheme.error
+        accent -> MaterialTheme.colorScheme.primary
+        else -> null
+    }
     OutlinedButton(
         onClick = onClick,
         modifier = (if (fullWidth) modifier.fillMaxWidth() else modifier).height(if (compact) 40.dp else 48.dp),
         enabled = enabled,
         shape = RoundedCornerShape(8.dp),
-        border = if (accent) {
-            BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+        border = if (corDestaque != null) {
+            BorderStroke(1.5.dp, corDestaque)
         } else {
             BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         },
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = if (accent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            contentColor = corDestaque ?: MaterialTheme.colorScheme.onSurfaceVariant
         ),
         contentPadding = if (compact) PaddingValues(horizontal = 12.dp) else ButtonDefaults.ContentPadding
     ) {

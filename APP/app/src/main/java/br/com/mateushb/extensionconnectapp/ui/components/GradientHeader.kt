@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import br.com.mateushb.extensionconnectapp.ui.theme.BrandPink
 import br.com.mateushb.extensionconnectapp.ui.theme.InkDark
 
@@ -28,6 +29,9 @@ import br.com.mateushb.extensionconnectapp.ui.theme.InkDark
  * marca centralizada (logo + título + selo em caixa alta). O gradiente se estende por trás da
  * status bar (edge-to-edge); [navigationIcon] (ex.: seta de voltar em "Recuperar senha") fica no
  * canto superior esquerdo, alinhado ao topo do logo.
+ *
+ * "Meu perfil" (spec 008, frame `36:483`): [compact] reduz os respiros (8dp entre logo e título) e usa
+ * título de 20sp Bold; [badge] é um slot abaixo do título (chip do perfil), no lugar do [subtitle].
  */
 @Composable
 fun GradientHeader(
@@ -35,6 +39,8 @@ fun GradientHeader(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     navigationIcon: (@Composable () -> Unit)? = null,
+    compact: Boolean = false,
+    badge: (@Composable () -> Unit)? = null,
     logo: @Composable () -> Unit = {}
 ) {
     Box(
@@ -46,17 +52,30 @@ fun GradientHeader(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 12.dp, bottom = 28.dp, start = 24.dp, end = 24.dp),
+                .padding(
+                    top = if (compact) 16.dp else 12.dp,
+                    bottom = if (compact) 24.dp else 28.dp,
+                    start = if (compact) 20.dp else 24.dp,
+                    end = if (compact) 20.dp else 24.dp
+                ),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             logo()
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(if (compact) 8.dp else 16.dp))
             Text(
                 text = title,
                 color = Color.White,
-                style = MaterialTheme.typography.headlineSmall,
+                style = if (compact) {
+                    MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp)
+                } else {
+                    MaterialTheme.typography.headlineSmall
+                },
                 textAlign = TextAlign.Center
             )
+            if (badge != null) {
+                Spacer(Modifier.height(8.dp))
+                badge()
+            }
             if (subtitle != null) {
                 Spacer(Modifier.height(4.dp))
                 Text(

@@ -22,6 +22,7 @@ import br.com.mateushb.extensionconnectapp.model.Usuario
 import br.com.mateushb.extensionconnectapp.model.lerInstanteIso
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import java.text.Collator
 import java.time.Instant
@@ -49,6 +50,20 @@ class ProjetoRepository(
                 .mapValues { (_, datas) -> datas.maxByOrNull { lerInstanteIso(it.data) ?: Instant.MIN }?.data }
             lista.map { it.toProjetoResumo(ultimaPorProjeto[it.projeto.id]) }
         }
+    }
+
+    // ===== Meu perfil (spec 008) =====
+
+    // Aluno: o projeto não finalizado de que participa (no máximo um). Professor: os não finalizados que
+    // orienta, por título. Administrador não orienta nem participa: lista vazia
+    fun projetosAtivosDoUsuario(usuario: Usuario): Flow<List<Projeto>> = when (usuario.perfil) {
+        PerfilUsuario.ALUNO -> projetoDao.observarProjetosAtivosDoAluno(usuario.id).map { lista ->
+            lista.map { it.toProjeto() }.sortedWith(compareBy(collator) { it.titulo }).take(1)
+        }
+        PerfilUsuario.PROFESSOR -> projetoDao.observarProjetosOrientadosAtivos(usuario.id).map { lista ->
+            lista.map { it.toProjeto() }.sortedWith(compareBy(collator) { it.titulo })
+        }
+        PerfilUsuario.ADMINISTRADOR -> flowOf(emptyList())
     }
 
     // ===== Wizard "Novo projeto" (spec 003) =====

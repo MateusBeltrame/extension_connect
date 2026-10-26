@@ -47,6 +47,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import br.com.mateushb.extensionconnectapp.BuildConfig
 import br.com.mateushb.extensionconnectapp.model.PerfilUsuario
 import br.com.mateushb.extensionconnectapp.model.Usuario
 import br.com.mateushb.extensionconnectapp.ui.state.CadastroUiState
@@ -58,16 +59,20 @@ import br.com.mateushb.extensionconnectapp.ui.telas.AcessoScreen
 import br.com.mateushb.extensionconnectapp.ui.telas.CompletarCadastroScreen
 import br.com.mateushb.extensionconnectapp.ui.telas.EditarPessoaScreen
 import br.com.mateushb.extensionconnectapp.ui.telas.EmBreveScreen
+import br.com.mateushb.extensionconnectapp.ui.telas.MeuPerfilScreen
 import br.com.mateushb.extensionconnectapp.ui.telas.NovoProjetoScreen
 import br.com.mateushb.extensionconnectapp.ui.telas.PessoasListaScreen
 import br.com.mateushb.extensionconnectapp.ui.telas.ProjetoDetalhesScreen
 import br.com.mateushb.extensionconnectapp.ui.telas.ProjetosListaScreen
 import br.com.mateushb.extensionconnectapp.ui.telas.RecuperarSenhaScreen
+import br.com.mateushb.extensionconnectapp.ui.telas.TrocarSenhaScreen
 import br.com.mateushb.extensionconnectapp.ui.viewmodel.AutenticacaoViewModel
 import br.com.mateushb.extensionconnectapp.ui.viewmodel.NovoProjetoViewModel
+import br.com.mateushb.extensionconnectapp.ui.viewmodel.PerfilViewModel
 import br.com.mateushb.extensionconnectapp.ui.viewmodel.PessoaViewModel
 import br.com.mateushb.extensionconnectapp.ui.viewmodel.ProjetoDetalhesViewModel
 import br.com.mateushb.extensionconnectapp.ui.viewmodel.ProjetoViewModel
+import br.com.mateushb.extensionconnectapp.ui.viewmodel.TrocarSenhaViewModel
 
 @Composable
 fun AppNavHost(
@@ -467,16 +472,79 @@ fun AppNavHost(
             }
 
             // ============================
-            // Agrupamento: Perfil e Mural (provisórias)
+            // Agrupamento: Perfil (spec 008)
             // ============================
             composable<AppRoute.MeuPerfil> { entrada ->
-                usuarioDaRota(autenticacaoViewModel.usuarioLogado) { redirecionarSemSessao(entrada) }
+                val usuario = usuarioDaRota(autenticacaoViewModel.usuarioLogado) { redirecionarSemSessao(entrada) }
                     ?: return@composable
 
-                // "Sair da conta" fica aqui até a feature 8 (Meu perfil)
-                ComBottomBar(alturaBottomBar) { EmBreveScreen(titulo = "Meu perfil", onSairClick = sair) }
+                val perfilViewModel: PerfilViewModel = viewModel()
+                // Snackbar de quem voltou de "Trocar senha" (gravado no savedStateHandle desta entrada)
+                val mensagem by entrada.savedStateHandle
+                    .getStateFlow<String?>(CHAVE_MENSAGEM_PERFIL, null)
+                    .collectAsState()
+
+                // O nome salvo chega pela sessão; o ViewModel ignora o mesmo usuário (rotação, nome editado)
+                LaunchedEffect(usuario.id) {
+                    perfilViewModel.carregarProjetos(usuario)
+                }
+
+                ComBottomBar(alturaBottomBar) {
+                    MeuPerfilScreen(
+                        usuario = usuario,
+                        projetosUiState = perfilViewModel.projetosUiState,
+                        salvarUiState = perfilViewModel.salvarUiState,
+                        versaoApp = BuildConfig.VERSION_NAME,
+                        mensagem = mensagem,
+                        onSalvarClick = { nome, ra, curso -> perfilViewModel.salvarMeusDados(usuario, nome, ra, curso) },
+                        // A Room também emite a linha nova, mas depois: aplicar já evita piscar o nome antigo
+                        onSalvoComSucesso = { autenticacaoViewModel.atualizarUsuarioLogado(it) },
+                        onProjetoClick = { projetoId ->
+                            navController.navigate(AppRoute.ProjetoDetalhes(projetoId)) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onTrocarSenhaClick = {
+                            navController.navigate(AppRoute.TrocarSenha) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onSairClick = sair,
+                        onTentarNovamente = { perfilViewModel.carregarProjetos(usuario) },
+                        onSalvarMensagemMostrada = { perfilViewModel.limparSalvarUiState() },
+                        onMensagemMostrada = { entrada.savedStateHandle[CHAVE_MENSAGEM_PERFIL] = null }
+                    )
+                }
             }
 
+            composable<AppRoute.TrocarSenha> { entrada ->
+                val usuario = usuarioDaRota(autenticacaoViewModel.usuarioLogado) { redirecionarSemSessao(entrada) }
+                    ?: return@composable
+
+                val trocarSenhaViewModel: TrocarSenhaViewModel = viewModel()
+
+                // Enquanto salva, a tela bloqueia o voltar (seta e sistema): o resultado sempre chega aqui
+                TrocarSenhaScreen(
+                    trocarSenhaUiState = trocarSenhaViewModel.trocarSenhaUiState,
+                    onSalvarClick = { atual, nova -> trocarSenhaViewModel.trocarSenha(usuario, atual, nova) },
+                    onVoltarClick = { voltarSeAtiva(navController, entrada) },
+                    onSalvoComSucesso = {
+                        trocarSenhaViewModel.limparTrocarSenhaUiState()
+                        // Só sai (e só avisa o perfil) se esta ainda for a entrada do topo
+                        if (navController.currentBackStackEntry?.id == entrada.id) {
+                            navController.previousBackStackEntry?.savedStateHandle?.set(
+                                CHAVE_MENSAGEM_PERFIL, "Senha alterada com sucesso"
+                            )
+                            navController.popBackStack()
+                        }
+                    },
+                    onErroMostrado = { trocarSenhaViewModel.limparTrocarSenhaUiState() }
+                )
+            }
+
+            // ============================
+            // Agrupamento: Mural (provisória até a feature 9)
+            // ============================
             composable<AppRoute.Mural> { entrada ->
                 // Acesso sem login entra com a feature 9; por ora só é alcançado pela BottomBar
                 usuarioDaRota(autenticacaoViewModel.usuarioLogado) { redirecionarSemSessao(entrada) }
@@ -490,6 +558,9 @@ fun AppNavHost(
 
 // Snackbar "Pessoa atualizada com sucesso", passado de EditarPessoa para PessoasLista
 private const val CHAVE_MENSAGEM_PESSOAS = "mensagemPessoas"
+
+// Snackbar "Senha alterada com sucesso", passado de TrocarSenha para MeuPerfil
+private const val CHAVE_MENSAGEM_PERFIL = "mensagemPerfil"
 
 // ===== BottomBar =====
 

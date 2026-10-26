@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -17,9 +16,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material.icons.outlined.PersonOff
 import androidx.compose.material.icons.outlined.PersonOutline
-import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.Shield
-import androidx.compose.material.icons.outlined.Tag
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -44,8 +41,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -170,7 +165,6 @@ private fun EditarPessoaConteudo(
     var nomeErro by rememberSaveable(pessoa.id) { mutableStateOf<String?>(null) }
     var raErro by rememberSaveable(pessoa.id) { mutableStateOf<String?>(null) }
     var perfilExpandido by remember { mutableStateOf(false) }
-    var cursoExpandido by remember { mutableStateOf(false) }
 
     // Abre o diálogo de bloqueio (10c ou a variação de participante) em vez de aplicar a mudança
     fun abrirBloqueio(bloqueio: BloqueioEdicaoPessoa) {
@@ -259,45 +253,14 @@ private fun EditarPessoaConteudo(
                 }
                 // RA e curso só para Aluno; opcionais (vazios = "Cadastro incompleto")
                 if (perfil == PerfilUsuario.ALUNO) {
-                    AppTextField(
-                        value = ra,
-                        // Letras são aceitas e apontadas ao salvar ("Informe apenas números", HU-03)
-                        onValueChange = { ra = it; raErro = null },
-                        placeholder = "Ex.: 2023104587",
-                        label = "RA / Matrícula",
-                        leadingIcon = { IconeCampo(Icons.Outlined.Tag) },
-                        supportingText = raErro,
-                        isError = raErro != null,
-                        enabled = !salvando,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done)
+                    CamposAluno(
+                        ra = ra,
+                        onRaChange = { ra = it; raErro = null },
+                        raErro = raErro,
+                        curso = curso,
+                        onCursoChange = { curso = it },
+                        enabled = !salvando
                     )
-                    Box {
-                        AppTextField(
-                            value = curso?.titulo.orEmpty(),
-                            onValueChange = {},
-                            placeholder = "Selecione o curso",
-                            label = "Curso",
-                            leadingIcon = { IconeCampo(Icons.Outlined.School) },
-                            trailingIcon = { IconeCampo(Icons.Outlined.KeyboardArrowDown) },
-                            enabled = !salvando,
-                            onClick = { cursoExpandido = true }
-                        )
-                        DropdownMenu(
-                            expanded = cursoExpandido,
-                            onDismissRequest = { cursoExpandido = false },
-                            containerColor = MaterialTheme.colorScheme.surface
-                        ) {
-                            Curso.entries.forEach { opcao ->
-                                DropdownMenuItem(
-                                    text = { Text(text = opcao.titulo, style = MaterialTheme.typography.bodyLarge) },
-                                    onClick = {
-                                        curso = opcao
-                                        cursoExpandido = false
-                                    }
-                                )
-                            }
-                        }
-                    }
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -342,7 +305,7 @@ private fun EditarPessoaConteudo(
                 val aluno = perfil == PerfilUsuario.ALUNO
                 nomeErro = if (nome.isBlank()) "Nome é obrigatório" else null
                 // RA é opcional; se preenchido, só números
-                raErro = if (aluno && ra.isNotBlank() && !ra.trim().all(Char::isDigit)) "Informe apenas números" else null
+                raErro = if (aluno) ValidacaoAcesso.erroRa(ra, obrigatorio = false) else null
                 if (nomeErro == null && raErro == null) {
                     onSalvarClick(
                         pessoa.copy(

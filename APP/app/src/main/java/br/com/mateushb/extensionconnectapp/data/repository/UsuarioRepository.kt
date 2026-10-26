@@ -9,6 +9,7 @@ import br.com.mateushb.extensionconnectapp.model.PerfilUsuario
 import br.com.mateushb.extensionconnectapp.model.PessoaDetalhes
 import br.com.mateushb.extensionconnectapp.model.ResultadoLogin
 import br.com.mateushb.extensionconnectapp.model.ResultadoSalvarPessoa
+import br.com.mateushb.extensionconnectapp.model.ResultadoTrocarSenha
 import br.com.mateushb.extensionconnectapp.model.Usuario
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -100,6 +101,34 @@ class UsuarioRepository(private val usuarioDao: UsuarioDao) {
             ResultadoSalvarPessoa.EdicaoPropriaProibida
         } catch (e: ConflitoEdicaoPessoa.Bloqueada) {
             ResultadoSalvarPessoa.Bloqueado(e.bloqueio)
+        }
+    }
+
+    // ===== Meu perfil (spec 008) =====
+
+    // RA e curso só são gravados se o usuário for Aluno (o DAO confere o perfil no banco). Devolve o
+    // usuário gravado sem o hash de senha, que não sai da camada de dados
+    suspend fun salvarMeusDados(usuarioId: Int, nome: String, ra: String?, curso: Curso?): Usuario {
+        val salvo = usuarioDao.salvarDadosProprios(
+            id = usuarioId,
+            nome = nome.trim(),
+            ra = ra?.trim(),
+            curso = curso?.name
+        ) ?: throw IllegalStateException("Usuário não encontrado no banco local.")
+        return salvo.toUsuario().copy(senhaHash = "")
+    }
+
+    suspend fun trocarSenha(usuarioId: Int, senhaAtual: String, novaSenha: String): ResultadoTrocarSenha {
+        val entity = usuarioDao.buscarPorId(usuarioId) ?: return ResultadoTrocarSenha.NaoEncontrado
+        if (!verificarSenha(senhaAtual, entity.senhaHash)) return ResultadoTrocarSenha.SenhaAtualIncorreta
+        val hashNovo = withContext(Dispatchers.Default) { HashSenha.gerar(novaSenha) }
+        val alteradas = usuarioDao.atualizarSenhaSeConfere(usuarioId, entity.senhaHash, hashNovo)
+        return when {
+            alteradas > 0 -> ResultadoTrocarSenha.Sucesso
+            // 0 linhas: a linha sumiu, ou a senha mudou entre a verificação e a gravação (a atual digitada
+            // já não confere)
+            usuarioDao.buscarPorId(usuarioId) == null -> ResultadoTrocarSenha.NaoEncontrado
+            else -> ResultadoTrocarSenha.SenhaAtualIncorreta
         }
     }
 

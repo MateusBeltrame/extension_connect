@@ -94,4 +94,27 @@ interface UsuarioDao {
         atualizar(atualizado)
         return atualizado
     }
+
+    // ===== Meu perfil (spec 008) =====
+
+    // Autoedição: só nome e, se a linha for Aluno, RA e curso. Perfil, e-mail, ativo, senha e aceite dos
+    // termos vêm sempre do banco, nunca da tela. RA/curso ausentes mantêm o gravado: na autoedição são
+    // obrigatórios (spec 008), o aluno não volta a "Cadastro incompleto". Retorna null se a linha não existe
+    @Transaction
+    suspend fun salvarDadosProprios(id: Int, nome: String, ra: String?, curso: String?): UsuarioEntity? {
+        val atual = buscarPorId(id) ?: return null
+        val aluno = atual.perfil == PerfilUsuario.ALUNO.name
+        val atualizado = atual.copy(
+            nome = nome,
+            ra = if (aluno) ra?.takeIf { it.isNotBlank() } ?: atual.ra else atual.ra,
+            curso = if (aluno) curso ?: atual.curso else atual.curso
+        )
+        atualizar(atualizado)
+        return atualizado
+    }
+
+    // Só grava se o hash ainda for o que foi verificado: uma troca feita no meio-tempo não é sobrescrita.
+    // Retorna o número de linhas alteradas (0 = senha mudou ou usuário não existe)
+    @Query("UPDATE usuarios SET senha_hash = :hashNovo WHERE id = :id AND senha_hash = :hashAtual")
+    suspend fun atualizarSenhaSeConfere(id: Int, hashAtual: String, hashNovo: String): Int
 }
